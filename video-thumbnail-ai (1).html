@@ -1,0 +1,1213 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NeuroPreviy — ИИ превью для видео</title>
+<style>
+:root{--bg:#0d0d0f;--s1:#18181c;--s2:#1f1f26;--s3:#28282f;--b:#2e2e38;--b2:#3a3a48;--t:#f0f0f5;--t2:#9898ab;--t3:#5a5a70;--ac:#7c6ef5;--ac2:#9b8ff7;--acb:rgba(124,110,245,.13);--acbr:rgba(124,110,245,.38);--gr:#4ade80;--grb:rgba(74,222,128,.1);--rd:#f87171;--rdb:rgba(248,113,113,.12);--am:#fbbf24;--r:10px;--rl:16px}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Inter',sans-serif;background:var(--bg);color:var(--t);min-height:100vh;font-size:14px;line-height:1.5}
+header{border-bottom:1px solid var(--b);padding:0 1.5rem;height:54px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:rgba(13,13,15,.96);backdrop-filter:blur(12px);z-index:100}
+.logo{display:flex;align-items:center;gap:9px;font-weight:700;font-size:16px;letter-spacing:-.3px}
+.logo-icon{width:30px;height:30px;background:linear-gradient(135deg,#7c6ef5,#22d3ee);border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:15px}
+.badge{font-size:10px;padding:2px 8px;border-radius:20px;background:var(--acb);color:var(--ac2);border:1px solid var(--acbr);font-weight:500}
+.hdr-nav{display:flex;gap:6px;align-items:center}
+.nav-btn{background:none;border:1px solid var(--b2);color:var(--t2);padding:6px 13px;border-radius:var(--r);cursor:pointer;font-size:12px;transition:all .15s}
+.nav-btn:hover{background:var(--s1);color:var(--t)}
+main{max-width:1100px;margin:0 auto;padding:1.5rem}
+
+/* STEPS */
+.steps{display:flex;align-items:center;padding:.9rem 1.3rem;background:var(--s1);border-radius:var(--rl);border:1px solid var(--b);margin-bottom:1.8rem}
+.step{display:flex;align-items:center;gap:7px;flex:1;opacity:.32;transition:opacity .2s}
+.step.active{opacity:1}.step.done{opacity:.65}
+.snum{width:22px;height:22px;border-radius:50%;border:1.5px solid var(--b2);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:var(--t2);flex-shrink:0}
+.step.active .snum{background:var(--ac);border-color:var(--ac);color:#fff}
+.step.done .snum{background:var(--grb);border-color:var(--gr);color:var(--gr)}
+.slbl{font-size:12px;font-weight:500;color:var(--t2);white-space:nowrap}
+.step.active .slbl{color:var(--t)}
+.sdiv{flex:none;width:24px;height:1px;background:var(--b);margin:0 2px}
+.panel{display:none}.panel.active{display:block}
+
+/* FORMS */
+.card{background:var(--s1);border:1px solid var(--b);border-radius:var(--rl);padding:1.3rem}
+.card-title{font-size:11px;font-weight:600;color:var(--t2);text-transform:uppercase;letter-spacing:.7px;margin-bottom:1rem}
+.inp{width:100%;background:var(--s2);border:1px solid var(--b);color:var(--t);padding:9px 13px;border-radius:var(--r);font-size:14px;outline:none;transition:border .15s}
+.inp:focus{border-color:var(--ac)}.inp::placeholder{color:var(--t3)}
+.inp-row{display:flex;gap:8px}
+.btn{background:var(--ac);color:#fff;border:none;padding:9px 20px;border-radius:var(--r);cursor:pointer;font-size:14px;font-weight:500;transition:all .15s;white-space:nowrap}
+.btn:hover{background:var(--ac2)}.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn-g{background:none;border:1px solid var(--b2);color:var(--t2);padding:8px 16px;border-radius:var(--r);cursor:pointer;font-size:13px;transition:all .15s}
+.btn-g:hover{background:var(--s2);color:var(--t)}
+.btn-sm{background:var(--s3);border:1px solid var(--b2);color:var(--t2);padding:6px 10px;border-radius:var(--r);cursor:pointer;font-size:12px;transition:all .15s}
+.btn-sm:hover{background:var(--s2);color:var(--t)}
+.lbl{font-size:12px;color:var(--t2);display:block;margin-bottom:5px}
+.sel{width:100%;background:var(--s2);border:1px solid var(--b);color:var(--t);padding:8px 11px;border-radius:var(--r);font-size:13px;outline:none;cursor:pointer}
+
+/* UPLOAD */
+.drop-zone{border:2px dashed var(--b2);border-radius:var(--rl);padding:3rem 2rem;text-align:center;cursor:pointer;transition:all .2s;background:var(--s1)}
+.drop-zone:hover,.drop-zone.drag{border-color:var(--ac);background:var(--acb)}
+.dz-icon{font-size:42px;margin-bottom:.8rem}
+.dz-title{font-size:17px;font-weight:600;margin-bottom:7px}
+.dz-sub{color:var(--t2);font-size:13px;margin-bottom:1.2rem}
+.dz-fmt{margin-top:1rem;color:var(--t3);font-size:11px}
+input[type=file]{display:none}
+.or-div{display:flex;align-items:center;gap:12px;margin:1.2rem 0;color:var(--t3);font-size:12px}
+.or-div::before,.or-div::after{content:'';flex:1;height:1px;background:var(--b)}
+.vinfo-box{display:flex;gap:1rem;padding:1rem;background:var(--s2);border:1px solid var(--b);border-radius:var(--rl);margin-top:1rem;align-items:center}
+.vthumb{width:108px;height:60px;background:var(--s3);border-radius:7px;flex-shrink:0;overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:22px}
+.vmeta{flex:1;min-width:0}
+.vname{font-weight:500;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:4px}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{font-size:11px;color:var(--t2);background:var(--s3);padding:2px 7px;border-radius:5px;border:1px solid var(--b)}
+.rm{background:none;border:none;color:var(--t3);cursor:pointer;font-size:16px;padding:4px;transition:color .15s}
+.rm:hover{color:var(--rd)}
+
+/* SETTINGS */
+.sg{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-top:1.5rem}
+.ratio-row{display:flex;gap:8px}
+.ratio-btn{flex:1;background:var(--s2);border:1.5px solid var(--b2);color:var(--t2);padding:10px 8px;border-radius:var(--r);cursor:pointer;text-align:center;transition:all .15s}
+.ratio-btn.sel{background:var(--acb);border-color:var(--ac);color:var(--ac2)}
+.ratio-v{font-size:20px;margin-bottom:3px}.ratio-l{font-size:12px;font-weight:600}.ratio-d{font-size:10px;color:var(--t3);margin-top:2px}
+.ai-list{display:flex;flex-direction:column;gap:5px}
+.ai-item{display:flex;align-items:center;gap:9px;padding:9px 11px;background:var(--s2);border:1.5px solid var(--b);border-radius:var(--r);cursor:pointer;transition:all .15s}
+.ai-item.sel{border-color:var(--ac);background:var(--acb)}
+.ai-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.ai-name{font-size:13px;font-weight:500;flex:1}
+.ai-tag{font-size:10px;padding:2px 7px;border-radius:12px;font-weight:500}
+.free{background:var(--grb);color:var(--gr)}.paid{background:rgba(251,191,36,.12);color:var(--am)}
+.ai-radio{width:14px;height:14px;border-radius:50%;border:1.5px solid var(--b2);flex-shrink:0;transition:all .15s}
+.ai-item.sel .ai-radio{border-color:var(--ac);background:var(--ac)}
+.style-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:5px}
+.style-btn{padding:8px 5px;background:var(--s2);border:1.5px solid var(--b);border-radius:8px;cursor:pointer;text-align:center;font-size:11px;color:var(--t2);transition:all .15s}
+.style-btn.sel{border-color:var(--ac);background:var(--acb);color:var(--ac2)}
+.si{font-size:16px;display:block;margin-bottom:3px}
+.key-row{display:flex;gap:5px;margin-top:7px}
+.key-inp{flex:1;background:var(--s2);border:1px solid var(--b);color:var(--t);padding:7px 10px;border-radius:var(--r);font-size:12px;font-family:monospace;outline:none}
+.key-inp:focus{border-color:var(--ac)}.key-inp::placeholder{color:var(--t3);font-family:inherit}
+.analyze-bar{margin-top:1.5rem;display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:1.1rem 1.4rem;background:var(--s1);border:1px solid var(--b);border-radius:var(--rl);flex-wrap:wrap}
+.analyze-info{color:var(--t2);font-size:13px}
+.btn-big{background:var(--ac);color:#fff;border:none;padding:11px 28px;border-radius:var(--r);cursor:pointer;font-size:14px;font-weight:600;display:flex;align-items:center;gap:8px;transition:all .2s}
+.btn-big:hover{background:var(--ac2);transform:translateY(-1px)}
+
+/* PROGRESS */
+.prog-card{padding:1.5rem;background:var(--s1);border:1px solid var(--b);border-radius:var(--rl)}
+.prog-title{font-weight:500;margin-bottom:1rem;display:flex;align-items:center;gap:8px;font-size:15px}
+.spinner{width:16px;height:16px;border:2px solid var(--b2);border-top-color:var(--ac);border-radius:50%;animation:spin .7s linear infinite;flex-shrink:0}
+@keyframes spin{to{transform:rotate(360deg)}}
+.pbar-bg{background:var(--s3);border-radius:99px;height:6px;overflow:hidden;margin-bottom:14px}
+.pbar-fill{height:100%;background:linear-gradient(90deg,var(--ac),#22d3ee);border-radius:99px;transition:width .5s ease;width:0%}
+.psteps{display:flex;flex-direction:column;gap:6px}
+.pstep{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--t3)}
+.pstep.done{color:var(--gr)}.pstep.cur{color:var(--t)}
+.psi{width:16px;text-align:center;font-size:13px;flex-shrink:0}
+.logbox{background:var(--s2);border:1px solid var(--b);border-radius:var(--r);padding:10px 12px;font-size:11px;color:var(--t2);line-height:1.8;max-height:120px;overflow-y:auto;margin-top:10px;font-family:'Courier New',monospace;white-space:pre-wrap}
+
+/* RESULTS */
+.results-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:1.5rem;flex-wrap:wrap;gap:8px}
+.results-title{font-size:20px;font-weight:600}
+.feat-tabs{display:flex;gap:4px;padding:4px;background:var(--s1);border-radius:var(--rl);margin-bottom:1.2rem;border:1px solid var(--b);overflow-x:auto}
+.ft{flex:1;padding:8px 10px;border-radius:10px;border:none;background:none;color:var(--t2);font-size:12px;font-weight:500;cursor:pointer;transition:all .15s;text-align:center;white-space:nowrap;min-width:80px}
+.ft:hover{color:var(--t)}.ft.act{background:var(--s2);color:var(--t);border:1px solid var(--b2)}
+.fsec{display:none}.fsec.act{display:block}
+
+/* THUMBNAILS */
+.th-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:1.2rem;margin-bottom:1.2rem}
+.th-card{background:var(--s1);border:1.5px solid var(--b);border-radius:var(--rl);overflow:hidden;transition:all .2s}
+.th-card:hover{border-color:var(--b2);transform:translateY(-2px)}
+.th-img-wrap{position:relative;background:var(--s3);overflow:hidden;display:flex;align-items:center;justify-content:center}
+.th-img-wrap img{width:100%;height:100%;object-fit:cover;display:block}
+.th-overlay{position:absolute;inset:0;background:rgba(0,0,0,0);display:flex;align-items:center;justify-content:center;gap:8px;transition:all .2s}
+.th-card:hover .th-overlay{background:rgba(0,0,0,.55)}
+.th-btn{opacity:0;background:#fff;color:#111;border:none;padding:7px 14px;border-radius:7px;cursor:pointer;font-size:12px;font-weight:600;transform:translateY(6px);transition:all .2s}
+.th-card:hover .th-btn{opacity:1;transform:translateY(0)}
+.th-footer{padding:11px}
+.th-name{font-size:13px;font-weight:500;margin-bottom:4px}
+.th-meta{font-size:11px;color:var(--t3);display:flex;gap:6px;flex-wrap:wrap}
+.th-badge{font-size:10px;padding:2px 6px;border-radius:8px;background:var(--s3);border:1px solid var(--b);color:var(--t2)}
+.gen-placeholder{aspect-ratio:16/9;background:linear-gradient(135deg,var(--s2),var(--s3));display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--t3);font-size:13px;gap:8px;min-height:180px}
+.gen-spin{width:32px;height:32px;border:3px solid var(--b2);border-top-color:var(--ac);border-radius:50%;animation:spin .8s linear infinite}
+
+/* TEXT TOOLS */
+.tt-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin-bottom:1.2rem}
+.tkcard{background:var(--s1);border:1.5px solid var(--b);border-radius:var(--rl);padding:1.1rem}
+.tk-title{font-size:14px;font-weight:600;margin-bottom:3px}
+.tk-desc{font-size:11px;color:var(--t2);margin-bottom:10px}
+.tk-out{background:var(--s2);border:1px solid var(--b);border-radius:8px;padding:10px;font-size:13px;color:var(--t);min-height:70px;line-height:1.65;margin-bottom:8px;white-space:pre-wrap;word-break:break-word}
+.tk-out.emp{color:var(--t3);font-style:italic}
+.tk-out.loading{color:var(--ac2);font-style:italic}
+.tags-wrap{display:flex;flex-wrap:wrap;gap:5px;min-height:40px;margin-bottom:8px;padding:8px;background:var(--s2);border:1px solid var(--b);border-radius:8px}
+.tag{font-size:12px;padding:3px 9px;border-radius:20px;border:1px solid var(--b2);background:var(--s3);color:var(--t2);cursor:pointer;transition:all .15s;user-select:none}
+.tag:hover{border-color:var(--ac);color:var(--ac2);background:var(--acb)}
+.tag-emp{color:var(--t3);font-style:italic;font-size:12px;align-self:center}
+.tk-acts{display:flex;gap:5px}
+.tk-btn{flex:1;padding:7px 8px;border-radius:7px;border:1px solid var(--b2);background:var(--s3);color:var(--t2);cursor:pointer;font-size:12px;text-align:center;transition:all .15s}
+.tk-btn.gen{background:var(--ac);border-color:var(--ac);color:#fff;font-weight:600}
+.tk-btn.gen:hover{background:var(--ac2)}
+.tk-btn:not(.gen):hover{background:var(--s2);color:var(--t)}
+.tk-btn:disabled{opacity:.4;cursor:not-allowed}
+.plat-row{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:12px}
+.plat-btn{padding:5px 12px;border-radius:20px;border:1px solid var(--b2);background:var(--s3);color:var(--t2);font-size:12px;cursor:pointer;transition:all .15s}
+.plat-btn.sel{background:var(--acb);border-color:var(--ac);color:var(--ac2)}
+
+/* EXPORT */
+.exp-card{padding:1.2rem;background:var(--s1);border:1px solid var(--b);border-radius:var(--rl);margin-top:1rem}
+.exp-title{font-size:14px;font-weight:600;margin-bottom:.9rem}
+.exp-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:7px}
+.exp-btn{padding:9px 6px;background:var(--s2);border:1px solid var(--b2);border-radius:var(--r);cursor:pointer;text-align:center;color:var(--t2);font-size:11px;transition:all .15s}
+.exp-btn:hover{background:var(--s3);color:var(--t)}
+.exp-icon{font-size:18px;display:block;margin-bottom:3px}
+
+/* NOTICE */
+.notice{padding:.8rem 1rem;border-radius:var(--r);font-size:12px;line-height:1.6;margin-bottom:1rem}
+.notice.warn{background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.3);color:var(--am)}
+.notice.info{background:var(--acb);border:1px solid var(--acbr);color:var(--ac2)}
+.notice.err{background:var(--rdb);border:1px solid rgba(248,113,113,.3);color:var(--rd)}
+.notice.ok{background:var(--grb);border:1px solid rgba(74,222,128,.3);color:var(--gr)}
+
+/* NOTIF */
+.notif{position:fixed;bottom:22px;right:22px;background:var(--s2);border:1px solid var(--b2);border-radius:var(--r);padding:11px 16px;font-size:13px;z-index:999;display:flex;align-items:center;gap:8px;transform:translateY(70px);opacity:0;transition:all .28s cubic-bezier(.16,1,.3,1);max-width:320px;pointer-events:none;box-shadow:0 8px 24px rgba(0,0,0,.4)}
+.notif.show{transform:translateY(0);opacity:1}
+.notif.ok{border-color:var(--gr)}.notif.err{border-color:var(--rd)}.notif.warn{border-color:var(--am)}
+
+@media(max-width:700px){
+  main{padding:1rem}
+  .sg,.tt-grid,.th-grid{grid-template-columns:1fr}
+  .exp-grid{grid-template-columns:repeat(2,1fr)}
+  .feat-tabs{gap:2px}.ft{font-size:11px;padding:6px 6px}
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo"><div class="logo-icon">🧠</div>NeuroPreviy<span class="badge">AI</span></div>
+  <div class="hdr-nav">
+    <button class="nav-btn" onclick="resetAll()">➕ Новый проект</button>
+    <button class="nav-btn" onclick="showHistory()">📁 История</button>
+  </div>
+</header>
+<main>
+  <!-- STEPS -->
+  <div class="steps">
+    <div class="step active" id="step1"><div class="snum" id="sn1">1</div><span class="slbl">Загрузка</span></div>
+    <div class="sdiv"></div>
+    <div class="step" id="step2"><div class="snum" id="sn2">2</div><span class="slbl">Настройки</span></div>
+    <div class="sdiv"></div>
+    <div class="step" id="step3"><div class="snum" id="sn3">3</div><span class="slbl">Генерация</span></div>
+    <div class="sdiv"></div>
+    <div class="step" id="step4"><div class="snum" id="sn4">4</div><span class="slbl">Результаты</span></div>
+  </div>
+
+  <!-- PANEL 1: UPLOAD -->
+  <div class="panel active" id="panel1">
+    <div class="notice info">💡 Приложение использует реальные ИИ-API. Для генерации картинок нужен API-ключ выбранной платформы. Тексты (название, описание, теги) генерирует Claude — бесплатно в рамках этого сервиса.</div>
+    <div class="drop-zone" id="dropZone"
+      onclick="document.getElementById('fi').click()"
+      ondragover="event.preventDefault();this.classList.add('drag')"
+      ondragleave="this.classList.remove('drag')"
+      ondrop="handleDrop(event)">
+      <div class="dz-icon">🎥</div>
+      <div class="dz-title">Перетащите видео сюда</div>
+      <div class="dz-sub">Видео анализируется локально в браузере — никуда не загружается</div>
+      <button class="btn" onclick="event.stopPropagation();document.getElementById('fi').click()">Выбрать файл</button>
+      <div class="dz-fmt">MP4 · MOV · AVI · MKV · WebM · до 10 ГБ</div>
+    </div>
+    <input type="file" id="fi" accept="video/*" onchange="handleFile(this.files[0])">
+    <div class="or-div">или вставьте прямую ссылку на видео</div>
+    <div class="inp-row">
+      <input class="inp" id="urlInp" type="url" placeholder="https://... (прямая ссылка на mp4/видеофайл)">
+      <button class="btn" onclick="handleUrl()">Загрузить</button>
+    </div>
+    <div id="vinfoWrap" style="display:none"><div class="vinfo-box" id="vinfo"></div></div>
+    <div style="margin-top:1.2rem;text-align:right">
+      <button class="btn" id="toS2" style="display:none" onclick="goToStep(2)">Далее: настройки →</button>
+    </div>
+  </div>
+
+  <!-- PANEL 2: SETTINGS -->
+  <div class="panel" id="panel2">
+    <div class="notice warn">⚠️ Для генерации <strong>картинок превью</strong> введите API-ключ выбранной платформы ниже. Без ключа картинки не сгенерируются. Тексты (название/описание/теги) создаются через Claude бесплатно.</div>
+    <div class="sg">
+      <!-- FORMAT -->
+      <div class="card">
+        <div class="card-title">Формат превью</div>
+        <div class="ratio-row">
+          <div class="ratio-btn sel" id="r169" onclick="selRatio('16:9')"><div class="ratio-v">▬</div><div class="ratio-l">16:9</div><div class="ratio-d">YouTube · горизонталь</div></div>
+          <div class="ratio-btn" id="r916" onclick="selRatio('9:16')"><div class="ratio-v">▮</div><div class="ratio-l">9:16</div><div class="ratio-d">Reels · вертикаль</div></div>
+        </div>
+        <div style="margin-top:1rem">
+          <label class="lbl">Количество вариантов</label>
+          <select class="sel" id="countSel">
+            <option value="2">2 варианта</option>
+            <option value="4">4 варианта</option>
+          </select>
+        </div>
+      </div>
+      <!-- AI IMAGE -->
+      <div class="card">
+        <div class="card-title">ИИ для генерации картинок</div>
+        <div class="ai-list">
+          <div class="ai-item sel" id="ai-hf" onclick="selAI(this,'hf')">
+            <div class="ai-dot" style="background:#f9a825"></div>
+            <div class="ai-name">Hugging Face FLUX</div>
+            <span class="ai-tag free">Бесплатно</span>
+            <div class="ai-radio"></div>
+          </div>
+          <div class="ai-item" id="ai-nano" onclick="selAI(this,'nano')">
+            <div class="ai-dot" style="background:#ff6f91"></div>
+            <div class="ai-name">NanoGPT (NanoБанан)</div>
+            <span class="ai-tag free">Бесплатно</span>
+            <div class="ai-radio"></div>
+          </div>
+          <div class="ai-item" id="ai-gemini" onclick="selAI(this,'gemini')">
+            <div class="ai-dot" style="background:#4285f4"></div>
+            <div class="ai-name">Google Gemini Imagen</div>
+            <span class="ai-tag paid">API ключ</span>
+            <div class="ai-radio"></div>
+          </div>
+          <div class="ai-item" id="ai-dalle" onclick="selAI(this,'dalle')">
+            <div class="ai-dot" style="background:#10a37f"></div>
+            <div class="ai-name">OpenAI DALL·E 3</div>
+            <span class="ai-tag paid">API ключ</span>
+            <div class="ai-radio"></div>
+          </div>
+          <div class="ai-item" id="ai-stab" onclick="selAI(this,'stab')">
+            <div class="ai-dot" style="background:#7c6ef5"></div>
+            <div class="ai-name">Stability AI SDXL</div>
+            <span class="ai-tag paid">API ключ</span>
+            <div class="ai-radio"></div>
+          </div>
+        </div>
+        <div id="keyBlock" style="margin-top:10px;display:none">
+          <label class="lbl" id="keyLbl">API ключ</label>
+          <div class="key-row">
+            <input class="key-inp" type="password" id="apiKey" placeholder="Введите ключ...">
+            <button class="btn-sm" onclick="toggleKey()">👁</button>
+            <button class="btn-sm" onclick="saveKey()">💾</button>
+          </div>
+        </div>
+      </div>
+      <!-- STYLE -->
+      <div class="card">
+        <div class="card-title">Стиль превью</div>
+        <div class="style-grid">
+          <div class="style-btn sel" onclick="selStyle(this,'cinematic')"><span class="si">🎬</span>Кино</div>
+          <div class="style-btn" onclick="selStyle(this,'photo')"><span class="si">📸</span>Фото</div>
+          <div class="style-btn" onclick="selStyle(this,'digital art')"><span class="si">🎨</span>Цифровое</div>
+          <div class="style-btn" onclick="selStyle(this,'3d render')"><span class="si">🖥️</span>3D</div>
+          <div class="style-btn" onclick="selStyle(this,'anime')"><span class="si">✨</span>Аниме</div>
+          <div class="style-btn" onclick="selStyle(this,'minimalist')"><span class="si">⬜</span>Минимал.</div>
+        </div>
+      </div>
+      <!-- LANG -->
+      <div class="card">
+        <div class="card-title">Язык текстов</div>
+        <select class="sel" id="langSel">
+          <option value="русском">🇷🇺 Русский</option>
+          <option value="английском">🇺🇸 English</option>
+          <option value="украинском">🇺🇦 Українська</option>
+          <option value="немецком">🇩🇪 Deutsch</option>
+          <option value="французском">🇫🇷 Français</option>
+          <option value="испанском">🇪🇸 Español</option>
+        </select>
+        <div style="margin-top:1rem">
+          <label class="lbl">Целевая платформа для текстов</label>
+          <select class="sel" id="platSel">
+            <option value="YouTube">YouTube</option>
+            <option value="Instagram">Instagram / Reels</option>
+            <option value="TikTok">TikTok</option>
+            <option value="ВКонтакте">ВКонтакте</option>
+            <option value="Telegram">Telegram</option>
+          </select>
+        </div>
+        <div style="margin-top:1rem">
+          <label class="lbl">Тон подачи</label>
+          <select class="sel" id="toneSel">
+            <option value="engaging and energetic">Энергичный / Вирусный</option>
+            <option value="professional and informative">Профессиональный</option>
+            <option value="friendly and casual">Дружеский / Casual</option>
+            <option value="educational and clear">Обучающий</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div class="analyze-bar">
+      <div class="analyze-info">
+        <div id="analyzeInfoTxt">Платформа: <strong>Hugging Face</strong> · Формат: <strong>16:9</strong> · Стиль: <strong>Кинематографический</strong></div>
+        <div style="margin-top:3px;font-size:11px;color:var(--t3)">Анализ видео + генерация через реальные API</div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn-g" onclick="goToStep(1)">← Назад</button>
+        <button class="btn-big" onclick="startGeneration()">🚀 Запустить генерацию</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- PANEL 3: PROGRESS -->
+  <div class="panel" id="panel3">
+    <div class="prog-card">
+      <div class="prog-title"><div class="spinner"></div><span id="progTitle">Анализируем видео...</span></div>
+      <div class="pbar-bg"><div class="pbar-fill" id="pbarFill"></div></div>
+      <div class="psteps" id="pstepsList">
+        <div class="pstep cur" id="ps1"><span class="psi">⏳</span>Извлечение информации о видео</div>
+        <div class="pstep" id="ps2"><span class="psi">⏳</span>Анализ содержимого через ИИ</div>
+        <div class="pstep" id="ps3"><span class="psi">⏳</span>Создание промптов для изображений</div>
+        <div class="pstep" id="ps4"><span class="psi">⏳</span>Генерация превью — изображение 1</div>
+        <div class="pstep" id="ps5"><span class="psi">⏳</span>Генерация превью — изображение 2</div>
+        <div class="pstep" id="ps6"><span class="psi">⏳</span>Генерация текстов (название, описание, теги)</div>
+      </div>
+      <div class="lbl" style="margin-top:12px">Журнал:</div>
+      <div class="logbox" id="logBox">Ожидание...</div>
+    </div>
+  </div>
+
+  <!-- PANEL 4: RESULTS -->
+  <div class="panel" id="panel4">
+    <div class="results-header">
+      <div>
+        <div class="results-title">✅ Результаты готовы</div>
+        <div style="color:var(--t2);font-size:13px;margin-top:3px" id="resSub"></div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn-g" onclick="goToStep(2)">← Настройки</button>
+        <button class="btn-g" onclick="resetAll()">🔄 Новое видео</button>
+      </div>
+    </div>
+    <div class="feat-tabs">
+      <button class="ft act" onclick="showTab('t-thumbs',this)">🖼️ Превью</button>
+      <button class="ft" onclick="showTab('t-texts',this)">📝 Тексты</button>
+    </div>
+
+    <!-- TAB: THUMBNAILS -->
+    <div class="fsec act" id="t-thumbs">
+      <div id="thumbsGrid" class="th-grid"></div>
+      <div class="exp-card">
+        <div class="exp-title">💾 Экспорт превью</div>
+        <div class="exp-grid">
+          <button class="exp-btn" onclick="downloadAll('png')"><span class="exp-icon">🖼️</span>Все PNG</button>
+          <button class="exp-btn" onclick="downloadAll('jpg')"><span class="exp-icon">📷</span>Все JPG</button>
+          <button class="exp-btn" onclick="regenThumbs()"><span class="exp-icon">🔁</span>Перегенерировать</button>
+          <button class="exp-btn" onclick="copyPrompts()"><span class="exp-icon">📋</span>Копировать промпты</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: TEXTS -->
+    <div class="fsec" id="t-texts">
+      <div class="plat-row" id="platRow">
+        <span style="font-size:12px;color:var(--t2);align-self:center">Платформа:</span>
+        <button class="plat-btn sel" onclick="selPlatText(this,'YouTube')">▶️ YouTube</button>
+        <button class="plat-btn" onclick="selPlatText(this,'Instagram')">📸 Instagram</button>
+        <button class="plat-btn" onclick="selPlatText(this,'TikTok')">🎵 TikTok</button>
+        <button class="plat-btn" onclick="selPlatText(this,'ВКонтакте')">💙 VK</button>
+        <button class="plat-btn" onclick="selPlatText(this,'Telegram')">✈️ Telegram</button>
+      </div>
+      <div class="tt-grid">
+        <div class="tkcard">
+          <div class="tk-title">🏷️ Название</div>
+          <div class="tk-desc" id="titleDesc">SEO-заголовок для вашего видео</div>
+          <div class="tk-out emp" id="titleOut">Нажмите «Создать»</div>
+          <div class="tk-acts">
+            <button class="tk-btn gen" onclick="genTitle()">✨ Создать</button>
+            <button class="tk-btn" onclick="copyField('titleOut')" title="Копировать">📋</button>
+            <button class="tk-btn" onclick="genTitle()" title="Обновить">🔄</button>
+          </div>
+        </div>
+        <div class="tkcard">
+          <div class="tk-title">📄 Описание</div>
+          <div class="tk-desc">Полное описание с тайм-кодами</div>
+          <div class="tk-out emp" id="descOut">Нажмите «Создать»</div>
+          <div class="tk-acts">
+            <button class="tk-btn gen" onclick="genDesc()">✨ Создать</button>
+            <button class="tk-btn" onclick="copyField('descOut')" title="Копировать">📋</button>
+            <button class="tk-btn" onclick="genDesc()" title="Обновить">🔄</button>
+          </div>
+        </div>
+        <div class="tkcard">
+          <div class="tk-title">🏷 Теги</div>
+          <div class="tk-desc">Хэштеги и ключевые слова</div>
+          <div class="tags-wrap" id="tagsOut"><span class="tag-emp">Нажмите «Создать»</span></div>
+          <div class="tk-acts">
+            <button class="tk-btn gen" onclick="genTags()">✨ Создать</button>
+            <button class="tk-btn" onclick="copyTags()" title="Копировать">📋</button>
+            <button class="tk-btn" onclick="genTags()" title="Обновить">🔄</button>
+          </div>
+        </div>
+      </div>
+      <div class="exp-card">
+        <div class="exp-title">💾 Экспорт текстов</div>
+        <div class="exp-grid">
+          <button class="exp-btn" onclick="expTexts('copy')"><span class="exp-icon">📋</span>Копировать всё</button>
+          <button class="exp-btn" onclick="expTexts('txt')"><span class="exp-icon">📄</span>TXT файл</button>
+          <button class="exp-btn" onclick="expTexts('json')"><span class="exp-icon">🗂️</span>JSON</button>
+          <button class="exp-btn" onclick="expTexts('md')"><span class="exp-icon">📝</span>Markdown</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+<div class="notif" id="notif"></div>
+<script>
+// ═══ СОСТОЯНИЕ ════════════════════════════════════════════════
+var state = {
+  videoFile: null, videoUrl: null, videoName: '', videoDuration: 0,
+  videoFrameB64: null,   // base64 кадра из видео для анализа
+  videoAnalysis: null,   // результат анализа Claude
+  imagePrompts: [],      // промпты для картинок
+  thumbUrls: [],         // URL готовых превью
+  ratio: '16:9', aiPlatform: 'hf', imgStyle: 'cinematic',
+  apiKey: '', lang: 'русском', platform: 'YouTube', tone: 'engaging and energetic',
+  history: JSON.parse(localStorage.getItem('np_history') || '[]')
+};
+
+var AI_INFO = {
+  hf:     { name: 'Hugging Face FLUX', free: true },
+  nano:   { name: 'NanoGPT (NanoБанан)', free: true },
+  gemini: { name: 'Google Gemini Imagen', free: false },
+  dalle:  { name: 'DALL·E 3', free: false },
+  stab:   { name: 'Stability AI', free: false }
+};
+
+// ═══ НАВИГАЦИЯ ════════════════════════════════════════════════
+function goToStep(n) {
+  if (n >= 2 && !state.videoFile && !state.videoUrl) { notify('Сначала загрузите видео', 'err'); return; }
+  for (var i = 1; i <= 4; i++) {
+    document.getElementById('panel' + i).classList.toggle('active', i === n);
+    var st = document.getElementById('step' + i), sn = document.getElementById('sn' + i);
+    st.classList.remove('active', 'done');
+    if (i === n) st.classList.add('active');
+    if (i < n)  { st.classList.add('done'); sn.textContent = '✓'; }
+    else if (i > n) sn.textContent = i;
+  }
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function showTab(id, btn) {
+  document.querySelectorAll('.fsec').forEach(function(s) { s.classList.remove('act'); });
+  document.querySelectorAll('.ft').forEach(function(b) { b.classList.remove('act'); });
+  document.getElementById(id).classList.add('act');
+  if (btn) btn.classList.add('act');
+}
+
+// ═══ ЗАГРУЗКА ВИДЕО ═══════════════════════════════════════════
+function handleDrop(e) {
+  e.preventDefault();
+  document.getElementById('dropZone').classList.remove('drag');
+  var f = e.dataTransfer.files[0];
+  if (f && f.type.startsWith('video/')) handleFile(f);
+  else notify('Нужен видеофайл', 'err');
+}
+
+function handleFile(f) {
+  if (!f) return;
+  state.videoFile = f;
+  state.videoUrl = null;
+  state.videoName = f.name;
+  var url = URL.createObjectURL(f);
+  showVInfo(f.name, fmtSize(f.size), url);
+}
+
+function handleUrl() {
+  var u = document.getElementById('urlInp').value.trim();
+  if (!u) { notify('Введите ссылку', 'err'); return; }
+  state.videoFile = null;
+  state.videoUrl = u;
+  state.videoName = u.split('/').pop().split('?')[0] || 'video';
+  showVInfo(state.videoName, '—', u);
+  notify('Ссылка принята', 'ok');
+}
+
+function showVInfo(name, size, src) {
+  document.getElementById('vinfoWrap').style.display = 'block';
+  document.getElementById('vinfo').innerHTML =
+    '<div class="vthumb" id="vthumbWrap">' +
+    (src ? '<video id="vidEl" src="' + src + '" muted playsinline preload="metadata" style="width:100%;height:100%;object-fit:cover" onloadedmetadata="onVideoMeta(this)"></video>' : '🎬') +
+    '</div>' +
+    '<div class="vmeta"><div class="vname">' + name + '</div>' +
+    '<div class="chips"><span class="chip">' + name.split('.').pop().toUpperCase() + '</span>' +
+    '<span class="chip">' + size + '</span>' +
+    '<span class="chip" id="durChip">Загружается...</span></div></div>' +
+    '<button class="rm" onclick="removeVideo()">✕</button>';
+  document.getElementById('toS2').style.display = 'inline-block';
+  updateAnalyzeInfo();
+  // Захватываем кадр когда видео загружено
+  setTimeout(captureFrame, 500);
+}
+
+function onVideoMeta(v) {
+  state.videoDuration = v.duration;
+  var d = v.duration;
+  var chip = document.getElementById('durChip');
+  if (chip) chip.textContent = Math.floor(d/60) + ':' + ('0'+Math.floor(d%60)).slice(-2);
+}
+
+function captureFrame() {
+  var v = document.getElementById('vidEl');
+  if (!v) return;
+  try {
+    v.currentTime = Math.min(5, v.duration * 0.1 || 1);
+    v.addEventListener('seeked', function onSeeked() {
+      v.removeEventListener('seeked', onSeeked);
+      var cv = document.createElement('canvas');
+      cv.width = 320; cv.height = 180;
+      var ctx = cv.getContext('2d');
+      ctx.drawImage(v, 0, 0, 320, 180);
+      state.videoFrameB64 = cv.toDataURL('image/jpeg', 0.7).split(',')[1];
+      addLog('✓ Кадр видео захвачен для анализа');
+    }, { once: true });
+  } catch(e) { addLog('ℹ Кадр недоступен (URL-ссылка), анализ по имени файла'); }
+}
+
+function removeVideo() {
+  state.videoFile = null; state.videoUrl = null; state.videoName = '';
+  state.videoFrameB64 = null; state.videoAnalysis = null;
+  document.getElementById('vinfoWrap').style.display = 'none';
+  document.getElementById('toS2').style.display = 'none';
+}
+
+function fmtSize(b) {
+  if (b > 1e9) return (b/1e9).toFixed(2) + ' ГБ';
+  if (b > 1e6) return (b/1e6).toFixed(1) + ' МБ';
+  return (b/1e3).toFixed(0) + ' КБ';
+}
+
+// ═══ НАСТРОЙКИ ════════════════════════════════════════════════
+function selRatio(r) {
+  state.ratio = r;
+  document.getElementById('r169').classList.toggle('sel', r === '16:9');
+  document.getElementById('r916').classList.toggle('sel', r === '9:16');
+  updateAnalyzeInfo();
+}
+
+function selAI(el, id) {
+  state.aiPlatform = id;
+  document.querySelectorAll('.ai-item').forEach(function(i) { i.classList.remove('sel'); });
+  el.classList.add('sel');
+  var needKey = !AI_INFO[id].free;
+  document.getElementById('keyBlock').style.display = needKey ? 'block' : 'none';
+  if (needKey) {
+    document.getElementById('keyLbl').textContent = 'API ключ для ' + AI_INFO[id].name;
+    var saved = localStorage.getItem('key_' + id);
+    if (saved) document.getElementById('apiKey').value = saved;
+  }
+  updateAnalyzeInfo();
+}
+
+function selStyle(el, s) {
+  state.imgStyle = s;
+  document.querySelectorAll('.style-btn').forEach(function(b) { b.classList.remove('sel'); });
+  el.classList.add('sel');
+  updateAnalyzeInfo();
+}
+
+function updateAnalyzeInfo() {
+  var ai = AI_INFO[state.aiPlatform] || { name: state.aiPlatform };
+  document.getElementById('analyzeInfoTxt').innerHTML =
+    'Платформа: <strong>' + ai.name + '</strong> · Формат: <strong>' + state.ratio +
+    '</strong> · Стиль: <strong>' + state.imgStyle + '</strong>';
+}
+
+function toggleKey() {
+  var inp = document.getElementById('apiKey');
+  inp.type = inp.type === 'password' ? 'text' : 'password';
+}
+function saveKey() {
+  var k = document.getElementById('apiKey').value.trim();
+  if (k) { localStorage.setItem('key_' + state.aiPlatform, k); notify('Ключ сохранён', 'ok'); }
+}
+
+// ═══ ГЛАВНАЯ ГЕНЕРАЦИЯ ════════════════════════════════════════
+function startGeneration() {
+  if (!state.videoFile && !state.videoUrl) { notify('Загрузите видео', 'err'); return; }
+  state.apiKey = document.getElementById('apiKey').value.trim();
+  state.lang = document.getElementById('langSel').value;
+  state.platform = document.getElementById('platSel').value;
+  state.tone = document.getElementById('toneSel').value;
+  var needKey = !AI_INFO[state.aiPlatform].free;
+  if (needKey && !state.apiKey) { notify('Введите API ключ для ' + AI_INFO[state.aiPlatform].name, 'err'); return; }
+  state.thumbUrls = [];
+  state.imagePrompts = [];
+  document.getElementById('thumbsGrid').innerHTML = '';
+  document.getElementById('titleOut').textContent = 'Нажмите «Создать»';
+  document.getElementById('titleOut').className = 'tk-out emp';
+  document.getElementById('descOut').textContent = 'Нажмите «Создать»';
+  document.getElementById('descOut').className = 'tk-out emp';
+  document.getElementById('tagsOut').innerHTML = '<span class="tag-emp">Нажмите «Создать»</span>';
+  goToStep(3);
+  runGeneration();
+}
+
+async function runGeneration() {
+  var logEl = document.getElementById('logBox');
+  logEl.textContent = '';
+
+  try {
+    // ШАГ 1: Анализ видео
+    setStep(1, 'cur'); addLog('Начинаем анализ видео: ' + state.videoName);
+    setPct(10);
+    var analysis = await analyzeVideoWithClaude();
+    state.videoAnalysis = analysis;
+    setStep(1, 'done'); setPct(25);
+    addLog('✓ Анализ завершён');
+
+    // ШАГ 2: Создание промптов
+    setStep(2, 'cur'); addLog('Создаём промпты для генерации изображений...');
+    var prompts = await generateImagePrompts(analysis);
+    state.imagePrompts = prompts;
+    setStep(2, 'done'); setStep(3, 'done'); setPct(40);
+    addLog('✓ Промпты готовы: ' + prompts.length + ' вариантов');
+
+    // ШАГ 3-4: Генерация изображений
+    var count = parseInt(document.getElementById('countSel').value) || 2;
+    var thumbUrls = [];
+    for (var i = 0; i < Math.min(count, prompts.length); i++) {
+      var stepId = i === 0 ? 4 : 5;
+      setStep(stepId, 'cur');
+      addLog('Генерация превью ' + (i+1) + '...');
+      addLog('Промпт: ' + prompts[i].substring(0, 100) + '...');
+      try {
+        var url = await generateImage(prompts[i]);
+        thumbUrls.push({ url: url, prompt: prompts[i], label: 'Вариант ' + (i+1) });
+        setStep(stepId, 'done');
+        addLog('✓ Превью ' + (i+1) + ' готово');
+      } catch(imgErr) {
+        addLog('⚠ Ошибка генерации ' + (i+1) + ': ' + imgErr.message);
+        thumbUrls.push({ url: null, prompt: prompts[i], label: 'Вариант ' + (i+1), error: imgErr.message });
+        setStep(stepId, 'done');
+      }
+      setPct(40 + (i+1) * 20);
+    }
+    state.thumbUrls = thumbUrls;
+
+    // ШАГ 5: Финал
+    setStep(6, 'done'); setPct(100);
+    addLog('✓ Всё готово!');
+    document.getElementById('progTitle').textContent = 'Готово!';
+
+    // Переходим к результатам
+    await new Promise(function(r) { setTimeout(r, 600); });
+    renderResults();
+    goToStep(4);
+
+  } catch(e) {
+    addLog('❌ Ошибка: ' + e.message);
+    document.getElementById('progTitle').textContent = 'Ошибка';
+    notify('Ошибка: ' + e.message, 'err');
+  }
+}
+
+// ═══ АНАЛИЗ ВИДЕО ЧЕРЕЗ CLAUDE ════════════════════════════════
+async function analyzeVideoWithClaude() {
+  addLog('Отправляем запрос в Claude...');
+  var messages = [];
+  if (state.videoFrameB64) {
+    messages = [{
+      role: 'user',
+      content: [
+        { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: state.videoFrameB64 } },
+        { type: 'text', text: buildAnalysisPrompt() }
+      ]
+    }];
+  } else {
+    messages = [{ role: 'user', content: buildAnalysisPrompt() }];
+  }
+  var resp = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 1000, messages: messages })
+  });
+  if (!resp.ok) throw new Error('Claude API: ' + resp.status);
+  var data = await resp.json();
+  var text = data.content && data.content[0] ? data.content[0].text : '';
+  addLog('Claude: ' + text.substring(0, 150));
+  return text;
+}
+
+function buildAnalysisPrompt() {
+  var name = state.videoName.replace(/\.[^.]+$/, '').replace(/[-_]/g, ' ');
+  var dur = state.videoDuration ? Math.round(state.videoDuration) + ' сек' : 'неизвестно';
+  return 'Проанализируй это видео.\n' +
+    'Название файла: ' + name + '\n' +
+    'Длительность: ' + dur + '\n' +
+    (state.videoFrameB64 ? 'На изображении — кадр из видео.\n' : '') +
+    'Определи:\n' +
+    '1. Основная тема и содержание видео (2-3 предложения)\n' +
+    '2. Ключевые объекты/люди/места в кадре\n' +
+    '3. Настроение и атмосфера\n' +
+    '4. Жанр (обзор/туториал/влог/новости/развлечение/спорт/кулинария и т.д.)\n' +
+    '5. Целевая аудитория\n' +
+    'Отвечай конкретно и кратко. Используй эту информацию для создания превью.';
+}
+
+// ═══ ГЕНЕРАЦИЯ ПРОМПТОВ ═══════════════════════════════════════
+async function generateImagePrompts(analysis) {
+  var name = state.videoName.replace(/\.[^.]+$/, '').replace(/[-_]/g, ' ');
+  var count = parseInt(document.getElementById('countSel').value) || 2;
+  var promptRequest = 'На основе анализа видео создай ' + count + ' разных промпта для генерации thumbnail (превью) для видео.\n\n' +
+    'Анализ видео:\n' + analysis + '\n\n' +
+    'Название видео: ' + name + '\n' +
+    'Стиль изображения: ' + state.imgStyle + '\n' +
+    'Соотношение сторон: ' + state.ratio + '\n\n' +
+    'Требования к каждому промпту:\n' +
+    '- На английском языке (для API генерации)\n' +
+    '- Детально описывай визуальные элементы\n' +
+    '- Укажи стиль: ' + state.imgStyle + ', high quality, sharp, detailed\n' +
+    '- Промпт должен создавать привлекательную картинку-превью\n' +
+    '- Каждый вариант должен быть разным по композиции\n\n' +
+    'Верни ТОЛЬКО промпты, по одному на строку, без нумерации и пояснений.';
+
+  var resp = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 800,
+      messages: [{ role: 'user', content: promptRequest }] })
+  });
+  if (!resp.ok) throw new Error('Claude prompts: ' + resp.status);
+  var data = await resp.json();
+  var text = data.content && data.content[0] ? data.content[0].text : '';
+  var lines = text.split('\n').map(function(l) { return l.trim(); }).filter(function(l) { return l.length > 20; });
+  if (!lines.length) lines = ['cinematic thumbnail, ' + name + ', ' + state.imgStyle + ', high quality, 4k'];
+  return lines.slice(0, count);
+}
+
+// ═══ ГЕНЕРАЦИЯ ИЗОБРАЖЕНИЙ ════════════════════════════════════
+async function generateImage(prompt) {
+  var fullPrompt = prompt + ', thumbnail, ' + state.ratio.replace(':','x') + ' aspect ratio';
+  switch (state.aiPlatform) {
+    case 'hf':     return await genHuggingFace(fullPrompt);
+    case 'nano':   return await genNanoGPT(fullPrompt);
+    case 'gemini': return await genGemini(fullPrompt);
+    case 'dalle':  return await genDallE(fullPrompt);
+    case 'stab':   return await genStability(fullPrompt);
+    default: throw new Error('Неизвестная платформа: ' + state.aiPlatform);
+  }
+}
+
+// Hugging Face — FLUX.1-schnell (бесплатно без ключа)
+async function genHuggingFace(prompt) {
+  var w = state.ratio === '9:16' ? 576 : 1024;
+  var h = state.ratio === '9:16' ? 1024 : 576;
+  addLog('HuggingFace FLUX: запрос...');
+  var resp = await fetch('https://api-inference.huggingface.co/models/black-forest-labs/FLUX.1-schnell', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(state.apiKey ? { 'Authorization': 'Bearer ' + state.apiKey } : {})
+    },
+    body: JSON.stringify({ inputs: prompt, parameters: { width: w, height: h, num_inference_steps: 4 } })
+  });
+  if (!resp.ok) {
+    var errText = await resp.text();
+    throw new Error('HF API ' + resp.status + ': ' + errText.substring(0, 200));
+  }
+  var blob = await resp.blob();
+  return URL.createObjectURL(blob);
+}
+
+// NanoGPT / NanoБанан — через Pollinations (реально бесплатный)
+async function genNanoGPT(prompt) {
+  var w = state.ratio === '9:16' ? 576 : 1280;
+  var h = state.ratio === '9:16' ? 1024 : 720;
+  addLog('NanoБанан (Pollinations): запрос...');
+  var encoded = encodeURIComponent(prompt);
+  var url = 'https://image.pollinations.ai/prompt/' + encoded + '?width=' + w + '&height=' + h + '&nologo=true&seed=' + Math.floor(Math.random()*99999);
+  // Проверяем что картинка загрузилась
+  return new Promise(function(resolve, reject) {
+    var img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = function() { resolve(url); };
+    img.onerror = function() { reject(new Error('Pollinations не ответил')); };
+    img.src = url;
+    setTimeout(function() { reject(new Error('Timeout 30s')); }, 30000);
+  });
+}
+
+// Google Gemini Imagen
+async function genGemini(prompt) {
+  if (!state.apiKey) throw new Error('Нужен Google API ключ');
+  addLog('Gemini Imagen: запрос...');
+  var resp = await fetch('https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-001:predict?key=' + state.apiKey, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      instances: [{ prompt: prompt }],
+      parameters: { sampleCount: 1, aspectRatio: state.ratio === '9:16' ? '9:16' : '16:9' }
+    })
+  });
+  if (!resp.ok) { var e = await resp.json(); throw new Error('Gemini: ' + (e.error && e.error.message || resp.status)); }
+  var data = await resp.json();
+  var b64 = data.predictions && data.predictions[0] && data.predictions[0].bytesBase64Encoded;
+  if (!b64) throw new Error('Gemini: пустой ответ');
+  return 'data:image/png;base64,' + b64;
+}
+
+// OpenAI DALL-E 3
+async function genDallE(prompt) {
+  if (!state.apiKey) throw new Error('Нужен OpenAI API ключ');
+  addLog('DALL·E 3: запрос...');
+  var size = state.ratio === '9:16' ? '1024x1792' : '1792x1024';
+  var resp = await fetch('https://api.openai.com/v1/images/generations', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + state.apiKey },
+    body: JSON.stringify({ model: 'dall-e-3', prompt: prompt, n: 1, size: size, quality: 'standard' })
+  });
+  if (!resp.ok) { var e = await resp.json(); throw new Error('DALL·E: ' + (e.error && e.error.message || resp.status)); }
+  var data = await resp.json();
+  return data.data && data.data[0] && data.data[0].url;
+}
+
+// Stability AI SDXL
+async function genStability(prompt) {
+  if (!state.apiKey) throw new Error('Нужен Stability AI API ключ');
+  addLog('Stability AI: запрос...');
+  var w = state.ratio === '9:16' ? 576 : 1024;
+  var h = state.ratio === '9:16' ? 1024 : 576;
+  var resp = await fetch('https://api.stability.ai/v1/generation/stable-diffusion-xl-1024-v1-0/text-to-image', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + state.apiKey, 'Accept': 'application/json' },
+    body: JSON.stringify({ text_prompts: [{ text: prompt, weight: 1 }], width: w, height: h, steps: 30, samples: 1 })
+  });
+  if (!resp.ok) { var e = await resp.json(); throw new Error('Stability: ' + (e.message || resp.status)); }
+  var data = await resp.json();
+  var b64 = data.artifacts && data.artifacts[0] && data.artifacts[0].base64;
+  if (!b64) throw new Error('Stability: пустой ответ');
+  return 'data:image/png;base64,' + b64;
+}
+
+// ═══ РЕНДЕР РЕЗУЛЬТАТОВ ══════════════════════════════════════
+function renderResults() {
+  var grid = document.getElementById('thumbsGrid');
+  grid.innerHTML = '';
+  var isPort = state.ratio === '9:16';
+  state.thumbUrls.forEach(function(th, i) {
+    var card = document.createElement('div');
+    card.className = 'th-card';
+    if (th.url) {
+      card.innerHTML =
+        '<div class="th-img-wrap" style="aspect-ratio:' + (isPort ? '9/16' : '16/9') + '">' +
+        '<img src="' + th.url + '" alt="' + th.label + '" loading="lazy">' +
+        '<div class="th-overlay">' +
+        '<button class="th-btn" onclick="dlSingle(' + i + ',\'png\')">⬇ PNG</button>' +
+        '<button class="th-btn" onclick="dlSingle(' + i + ',\'jpg\')">⬇ JPG</button>' +
+        '</div></div>' +
+        '<div class="th-footer"><div class="th-name">' + th.label + '</div>' +
+        '<div class="th-meta"><span class="th-badge">' + state.ratio + '</span>' +
+        '<span class="th-badge">' + (AI_INFO[state.aiPlatform] || {name:state.aiPlatform}).name + '</span>' +
+        '<span class="th-badge">' + state.imgStyle + '</span></div></div>';
+    } else {
+      card.innerHTML =
+        '<div class="th-img-wrap" style="aspect-ratio:' + (isPort ? '9/16' : '16/9') + '">' +
+        '<div class="gen-placeholder">❌<div style="font-size:11px;text-align:center;max-width:200px">' + (th.error || 'Ошибка генерации') + '</div>' +
+        '<button class="btn" style="font-size:12px;padding:6px 14px;margin-top:8px" onclick="regenSingle(' + i + ')">Повторить</button>' +
+        '</div></div>' +
+        '<div class="th-footer"><div class="th-name">' + th.label + '</div></div>';
+    }
+    grid.appendChild(card);
+  });
+  document.getElementById('resSub').textContent = state.videoName + ' · ' + AI_INFO[state.aiPlatform].name + ' · ' + state.ratio;
+  // Сохраняем в историю
+  var entry = { name: state.videoName, date: new Date().toLocaleString('ru'), ai: state.aiPlatform };
+  state.history.unshift(entry);
+  if (state.history.length > 20) state.history.pop();
+  localStorage.setItem('np_history', JSON.stringify(state.history));
+}
+
+// ═══ ГЕНЕРАЦИЯ ТЕКСТОВ ЧЕРЕЗ CLAUDE ══════════════════════════
+var currentTextPlatform = 'YouTube';
+
+function selPlatText(btn, plat) {
+  currentTextPlatform = plat;
+  document.querySelectorAll('.plat-btn').forEach(function(b) { b.classList.remove('sel'); });
+  btn.classList.add('sel');
+}
+
+async function callClaudeText(prompt) {
+  var resp = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 1000,
+      messages: [{ role: 'user', content: prompt }] })
+  });
+  if (!resp.ok) throw new Error('Claude: ' + resp.status);
+  var data = await resp.json();
+  return data.content && data.content[0] ? data.content[0].text : '';
+}
+
+function getVideoContext() {
+  var name = state.videoName.replace(/\.[^.]+$/, '').replace(/[-_]/g, ' ');
+  return 'Видео: "' + name + '"\n' +
+    (state.videoAnalysis ? 'Анализ содержимого:\n' + state.videoAnalysis + '\n' : '') +
+    'Платформа: ' + currentTextPlatform + '\n' +
+    'Язык ответа: ' + state.lang + '\n' +
+    'Тон: ' + state.tone + '\n';
+}
+
+async function genTitle() {
+  var el = document.getElementById('titleOut');
+  el.className = 'tk-out loading'; el.textContent = '✨ Генерирую...';
+  try {
+    var prompt = getVideoContext() +
+      '\nСоздай ONE цепляющий заголовок для этого видео на ' + state.lang + ' языке.\n' +
+      'Требования: максимум 100 символов, содержит ключевые слова, вызывает желание кликнуть.\n' +
+      'Верни ТОЛЬКО заголовок, без кавычек и пояснений.';
+    var result = await callClaudeText(prompt);
+    el.textContent = result.trim();
+    el.className = 'tk-out';
+    notify('Название создано', 'ok');
+  } catch(e) {
+    el.textContent = 'Ошибка: ' + e.message;
+    el.className = 'tk-out';
+    notify('Ошибка: ' + e.message, 'err');
+  }
+}
+
+async function genDesc() {
+  var el = document.getElementById('descOut');
+  el.className = 'tk-out loading'; el.textContent = '✨ Генерирую...';
+  try {
+    var platInstr = {
+      'YouTube': 'Включи тайм-коды (00:00 Введение, и т.д.), призыв подписаться и поставить лайк.',
+      'Instagram': 'Короткое (3-5 строк), живой стиль, эмодзи, призыв сохранить.',
+      'TikTok': 'Очень короткое (1-3 строки), вирусный стиль, хук в начале.',
+      'ВКонтакте': 'Развёрнутое, информативное, без лишних эмодзи.',
+      'Telegram': 'Структурированное, с эмодзи-маркерами, призыв к обсуждению.'
+    }[currentTextPlatform] || '';
+    var prompt = getVideoContext() +
+      '\nНапиши описание для этого видео на ' + state.lang + ' языке для ' + currentTextPlatform + '.\n' +
+      platInstr + '\n' +
+      'Описание должно точно отражать содержимое видео. Верни ТОЛЬКО текст описания.';
+    var result = await callClaudeText(prompt);
+    el.textContent = result.trim();
+    el.className = 'tk-out';
+    notify('Описание создано', 'ok');
+  } catch(e) {
+    el.textContent = 'Ошибка: ' + e.message;
+    el.className = 'tk-out';
+    notify('Ошибка: ' + e.message, 'err');
+  }
+}
+
+async function genTags() {
+  var wrap = document.getElementById('tagsOut');
+  wrap.innerHTML = '<span class="tag-emp" style="opacity:.5">✨ Генерирую...</span>';
+  try {
+    var prompt = getVideoContext() +
+      '\nСоздай 15-20 хэштегов и ключевых слов для этого видео на ' + state.lang + ' языке.\n' +
+      'Формат: каждый тег начинается с # и через пробел. Только теги, без пояснений.\n' +
+      'Теги должны точно соответствовать содержимому видео.';
+    var result = await callClaudeText(prompt);
+    var tags = result.trim().split(/\s+/).filter(function(t) { return t.startsWith('#') && t.length > 1; });
+    if (!tags.length) {
+      tags = result.trim().split(/[,\n]/).map(function(t) { return t.trim(); })
+        .filter(function(t) { return t.length > 1; })
+        .map(function(t) { return t.startsWith('#') ? t : '#'+t; });
+    }
+    wrap.innerHTML = tags.map(function(t) {
+      return '<span class="tag" onclick="this.classList.toggle(\'sel\')">' + t + '</span>';
+    }).join('');
+    if (!wrap.children.length) wrap.innerHTML = '<span class="tag-emp">Не удалось создать теги</span>';
+    notify('Теги созданы', 'ok');
+  } catch(e) {
+    wrap.innerHTML = '<span class="tag-emp">Ошибка: ' + e.message + '</span>';
+    notify('Ошибка: ' + e.message, 'err');
+  }
+}
+
+// ═══ СКАЧИВАНИЕ ═══════════════════════════════════════════════
+function dlSingle(idx, fmt) {
+  var th = state.thumbUrls[idx];
+  if (!th || !th.url) { notify('Картинка не готова', 'err'); return; }
+  if (th.url.startsWith('blob:') || th.url.startsWith('data:') || th.url.startsWith('https://image.pollinations')) {
+    fetchAndDownload(th.url, 'thumbnail_' + (idx+1) + '_' + state.ratio.replace(':','x') + '.' + fmt);
+  } else {
+    fetchAndDownload(th.url, 'thumbnail_' + (idx+1) + '.' + fmt);
+  }
+}
+
+function fetchAndDownload(url, filename) {
+  if (url.startsWith('data:')) {
+    var a = document.createElement('a'); a.href = url; a.download = filename; a.click();
+    notify('Скачивание...', 'ok'); return;
+  }
+  fetch(url).then(function(r) { return r.blob(); }).then(function(blob) {
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = filename; a.click();
+    notify('Скачано: ' + filename, 'ok');
+  }).catch(function(e) {
+    // Если CORS — открываем в новой вкладке
+    window.open(url, '_blank');
+    notify('Открыто в новой вкладке (CORS)', 'warn');
+  });
+}
+
+function downloadAll(fmt) {
+  state.thumbUrls.forEach(function(th, i) { if (th.url) setTimeout(function() { dlSingle(i, fmt); }, i * 600); });
+}
+
+async function regenSingle(idx) {
+  if (!state.imagePrompts[idx]) { notify('Промпт не найден', 'err'); return; }
+  var grid = document.getElementById('thumbsGrid');
+  var cards = grid.children;
+  if (cards[idx]) {
+    var wrap = cards[idx].querySelector('.th-img-wrap');
+    if (wrap) wrap.innerHTML = '<div class="gen-placeholder"><div class="gen-spin"></div><div>Генерирую...</div></div>';
+  }
+  try {
+    var url = await generateImage(state.imagePrompts[idx]);
+    state.thumbUrls[idx].url = url;
+    state.thumbUrls[idx].error = null;
+    renderResults();
+    notify('Превью ' + (idx+1) + ' перегенерировано', 'ok');
+  } catch(e) {
+    state.thumbUrls[idx].error = e.message;
+    renderResults();
+    notify('Ошибка: ' + e.message, 'err');
+  }
+}
+
+async function regenThumbs() {
+  notify('Перегенерация...', 'ok');
+  state.thumbUrls = [];
+  var grid = document.getElementById('thumbsGrid');
+  state.imagePrompts.forEach(function(_, i) {
+    var card = document.createElement('div');
+    card.className = 'th-card';
+    card.innerHTML = '<div class="th-img-wrap" style="aspect-ratio:' + (state.ratio==='9:16'?'9/16':'16/9') + '">' +
+      '<div class="gen-placeholder"><div class="gen-spin"></div><div>Генерирую ' + (i+1) + '...</div></div></div>';
+    if (i === 0) grid.innerHTML = '';
+    grid.appendChild(card);
+  });
+  for (var i = 0; i < state.imagePrompts.length; i++) {
+    try {
+      var url = await generateImage(state.imagePrompts[i]);
+      state.thumbUrls.push({ url: url, prompt: state.imagePrompts[i], label: 'Вариант ' + (i+1) });
+    } catch(e) {
+      state.thumbUrls.push({ url: null, prompt: state.imagePrompts[i], label: 'Вариант ' + (i+1), error: e.message });
+    }
+  }
+  renderResults();
+}
+
+function copyPrompts() {
+  var txt = state.imagePrompts.join('\n\n');
+  if (txt) navigator.clipboard.writeText(txt).then(function() { notify('Промпты скопированы', 'ok'); });
+}
+
+// ═══ ЭКСПОРТ ТЕКСТОВ ══════════════════════════════════════════
+function copyField(id) {
+  var t = document.getElementById(id).textContent;
+  if (t && !t.includes('Нажмите') && !t.includes('Генерирую') && !t.includes('Ошибка'))
+    navigator.clipboard.writeText(t).then(function() { notify('Скопировано!', 'ok'); });
+}
+
+function copyTags() {
+  var tags = Array.from(document.querySelectorAll('#tagsOut .tag')).map(function(t) { return t.textContent; }).join(' ');
+  if (tags) navigator.clipboard.writeText(tags).then(function() { notify('Теги скопированы!', 'ok'); });
+}
+
+function expTexts(type) {
+  var title = document.getElementById('titleOut').textContent;
+  var desc = document.getElementById('descOut').textContent;
+  var tags = Array.from(document.querySelectorAll('#tagsOut .tag')).map(function(t) { return t.textContent; }).join(' ');
+  if (type === 'copy') {
+    navigator.clipboard.writeText('НАЗВАНИЕ:\n' + title + '\n\nОПИСАНИЕ:\n' + desc + '\n\nТЕГИ:\n' + tags)
+      .then(function() { notify('Всё скопировано!', 'ok'); });
+    return;
+  }
+  var content = '', ext = 'txt';
+  if (type === 'json') { content = JSON.stringify({ title: title, description: desc, tags: tags, platform: currentTextPlatform, video: state.videoName }, null, 2); ext = 'json'; }
+  else if (type === 'md') { content = '# ' + title + '\n\n## Описание\n' + desc + '\n\n## Теги\n' + tags; ext = 'md'; }
+  else content = 'НАЗВАНИЕ:\n' + title + '\n\nОПИСАНИЕ:\n' + desc + '\n\nТЕГИ:\n' + tags;
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([content], { type: 'text/plain;charset=utf-8' }));
+  a.download = 'neuropreviy_' + state.videoName.replace(/[^a-zA-Zа-яА-Я0-9]/g, '_') + '.' + ext;
+  a.click();
+  notify('Файл ' + ext.toUpperCase() + ' сохранён', 'ok');
+}
+
+// ═══ ИСТОРИЯ ══════════════════════════════════════════════════
+function showHistory() {
+  var el = document.getElementById('histPanel');
+  if (el) { el.remove(); return; }
+  var panel = document.createElement('div');
+  panel.id = 'histPanel';
+  panel.style.cssText = 'position:fixed;top:0;right:0;width:320px;height:100vh;background:var(--s1);border-left:1px solid var(--b);z-index:200;overflow-y:auto;padding:1.2rem;box-shadow:-4px 0 30px rgba(0,0,0,.5)';
+  panel.innerHTML =
+    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem">' +
+    '<div style="font-size:15px;font-weight:600">📁 История проектов</div>' +
+    '<button onclick="document.getElementById(\'histPanel\').remove()" style="background:none;border:none;color:var(--t2);cursor:pointer;font-size:20px">✕</button></div>' +
+    '<div style="font-size:12px;color:var(--t3);margin-bottom:.8rem">' + state.history.length + ' проектов</div>' +
+    (state.history.length ? state.history.map(function(h, i) {
+      return '<div style="padding:10px;background:var(--s2);border:1px solid var(--b);border-radius:10px;margin-bottom:6px">' +
+        '<div style="font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + h.name + '</div>' +
+        '<div style="font-size:11px;color:var(--t3);margin-top:2px">' + h.date + ' · ' + (AI_INFO[h.ai] || {name:h.ai}).name + '</div></div>';
+    }).join('') : '<div style="color:var(--t3);font-size:13px;text-align:center;padding:2rem">История пуста</div>') +
+    (state.history.length ? '<button onclick="clearHistory()" style="width:100%;margin-top:.8rem;padding:8px;background:var(--rdb);border:1px solid rgba(248,113,113,.3);color:var(--rd);border-radius:var(--r);cursor:pointer;font-size:12px">🗑 Очистить историю</button>' : '');
+  document.body.appendChild(panel);
+  setTimeout(function() {
+    var h = function(e) { if (!panel.contains(e.target) && !e.target.closest('.nav-btn')) { panel.remove(); document.removeEventListener('click', h); } };
+    document.addEventListener('click', h);
+  }, 200);
+}
+
+function clearHistory() {
+  state.history = []; localStorage.removeItem('np_history');
+  document.getElementById('histPanel') && document.getElementById('histPanel').remove();
+  notify('История очищена', 'ok');
+}
+
+// ═══ ПРОГРЕСС ═════════════════════════════════════════════════
+function setStep(n, status) {
+  var el = document.getElementById('ps' + n); if (!el) return;
+  el.classList.remove('cur', 'done');
+  el.classList.add(status);
+  el.querySelector('.psi').textContent = status === 'done' ? '✓' : status === 'cur' ? '⚡' : '⏳';
+}
+function setPct(p) { document.getElementById('pbarFill').style.width = p + '%'; }
+function addLog(msg) {
+  var el = document.getElementById('logBox');
+  el.textContent += (el.textContent ? '\n' : '') + msg;
+  el.scrollTop = el.scrollHeight;
+}
+
+// ═══ УТИЛИТЫ ══════════════════════════════════════════════════
+function resetAll() {
+  state.videoFile = null; state.videoUrl = null; state.videoName = '';
+  state.videoFrameB64 = null; state.videoAnalysis = null;
+  state.thumbUrls = []; state.imagePrompts = [];
+  document.getElementById('vinfoWrap').style.display = 'none';
+  document.getElementById('toS2').style.display = 'none';
+  document.getElementById('urlInp').value = '';
+  document.getElementById('logBox').textContent = 'Ожидание...';
+  document.getElementById('pbarFill').style.width = '0%';
+  document.getElementById('titleOut').textContent = 'Нажмите «Создать»';
+  document.getElementById('titleOut').className = 'tk-out emp';
+  document.getElementById('descOut').textContent = 'Нажмите «Создать»';
+  document.getElementById('descOut').className = 'tk-out emp';
+  document.getElementById('tagsOut').innerHTML = '<span class="tag-emp">Нажмите «Создать»</span>';
+  document.getElementById('thumbsGrid').innerHTML = '';
+  [1,2,3,4,5,6].forEach(function(i) {
+    var el = document.getElementById('ps' + i);
+    if (el) { el.className = 'pstep' + (i===1?' cur':''); el.querySelector('.psi').textContent = '⏳'; }
+  });
+  goToStep(1);
+}
+
+var _notifTimer;
+function notify(msg, type) {
+  var el = document.getElementById('notif');
+  el.className = 'notif ' + (type || 'ok');
+  el.innerHTML = (type === 'err' ? '❌' : type === 'warn' ? '⚠️' : '✅') + ' ' + msg;
+  el.classList.add('show');
+  clearTimeout(_notifTimer);
+  _notifTimer = setTimeout(function() { el.classList.remove('show'); }, 4000);
+}
+
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') {
+    var h = document.getElementById('histPanel'); if (h) h.remove();
+  }
+});
+</script>
+</body>
+</html>

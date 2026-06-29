@@ -448,13 +448,17 @@ input[type=file]{display:none}
 </main>
 <div class="notif" id="notif"></div>
 <script>
+// ═══ КОНФИГУРАЦИЯ ПРОКСИ ══════════════════════════════════════
+// После деплоя Cloudflare Worker вставь URL сюда:
+var PROXY_URL = localStorage.getItem('np_proxy') || '';
+
 // ═══ СОСТОЯНИЕ ════════════════════════════════════════════════
 var state = {
   videoFile: null, videoUrl: null, videoName: '', videoDuration: 0,
-  videoFrameB64: null,   // base64 кадра из видео для анализа
-  videoAnalysis: null,   // результат анализа Claude
-  imagePrompts: [],      // промпты для картинок
-  thumbUrls: [],         // URL готовых превью
+  videoFrameB64: null,
+  videoAnalysis: null,
+  imagePrompts: [],
+  thumbUrls: [],
   ratio: '16:9', aiPlatform: 'hf', imgStyle: 'cinematic',
   apiKey: '', lang: 'русском', platform: 'YouTube', tone: 'engaging and energetic',
   history: JSON.parse(localStorage.getItem('np_history') || '[]')
@@ -462,29 +466,29 @@ var state = {
 
 var AI_INFO = {
   hf:     { name: 'Hugging Face FLUX', free: true },
-  nano:   { name: 'NanoGPT (NanoБанан)', free: true },
+  nano:   { name: 'NanoБанан (Pollinations)', free: true },
   gemini: { name: 'Google Gemini Imagen', free: false },
-  dalle:  { name: 'DALL·E 3', free: false },
-  stab:   { name: 'Stability AI', free: false }
+  dalle:  { name: 'OpenAI DALL·E 3', free: false },
+  stab:   { name: 'Stability AI SDXL', free: false }
 };
 
 // ═══ НАВИГАЦИЯ ════════════════════════════════════════════════
 function goToStep(n) {
   if (n >= 2 && !state.videoFile && !state.videoUrl) { notify('Сначала загрузите видео', 'err'); return; }
   for (var i = 1; i <= 4; i++) {
-    document.getElementById('panel' + i).classList.toggle('active', i === n);
-    var st = document.getElementById('step' + i), sn = document.getElementById('sn' + i);
-    st.classList.remove('active', 'done');
-    if (i === n) st.classList.add('active');
-    if (i < n)  { st.classList.add('done'); sn.textContent = '✓'; }
-    else if (i > n) sn.textContent = i;
+    document.getElementById('panel'+i).classList.toggle('active', i===n);
+    var st=document.getElementById('step'+i), sn=document.getElementById('sn'+i);
+    st.classList.remove('active','done');
+    if (i===n) st.classList.add('active');
+    if (i<n) { st.classList.add('done'); sn.textContent='✓'; }
+    else if (i>n) sn.textContent=i;
   }
-  window.scrollTo({ top: 0, behavior: 'smooth' });
+  window.scrollTo({top:0,behavior:'smooth'});
 }
 
 function showTab(id, btn) {
-  document.querySelectorAll('.fsec').forEach(function(s) { s.classList.remove('act'); });
-  document.querySelectorAll('.ft').forEach(function(b) { b.classList.remove('act'); });
+  document.querySelectorAll('.fsec').forEach(function(s){s.classList.remove('act');});
+  document.querySelectorAll('.ft').forEach(function(b){b.classList.remove('act');});
   document.getElementById(id).classList.add('act');
   if (btn) btn.classList.add('act');
 }
@@ -503,8 +507,7 @@ function handleFile(f) {
   state.videoFile = f;
   state.videoUrl = null;
   state.videoName = f.name;
-  var url = URL.createObjectURL(f);
-  showVInfo(f.name, fmtSize(f.size), url);
+  showVInfo(f.name, fmtSize(f.size), URL.createObjectURL(f));
 }
 
 function handleUrl() {
@@ -520,692 +523,660 @@ function handleUrl() {
 function showVInfo(name, size, src) {
   document.getElementById('vinfoWrap').style.display = 'block';
   document.getElementById('vinfo').innerHTML =
-    '<div class="vthumb" id="vthumbWrap">' +
-    (src ? '<video id="vidEl" src="' + src + '" muted playsinline preload="metadata" style="width:100%;height:100%;object-fit:cover" onloadedmetadata="onVideoMeta(this)"></video>' : '🎬') +
-    '</div>' +
-    '<div class="vmeta"><div class="vname">' + name + '</div>' +
-    '<div class="chips"><span class="chip">' + name.split('.').pop().toUpperCase() + '</span>' +
-    '<span class="chip">' + size + '</span>' +
-    '<span class="chip" id="durChip">Загружается...</span></div></div>' +
+    '<div class="vthumb"><video id="vidEl" src="'+src+'" muted playsinline preload="metadata" ' +
+    'style="width:100%;height:100%;object-fit:cover" onloadedmetadata="onVidMeta(this)"></video></div>' +
+    '<div class="vmeta"><div class="vname">'+name+'</div>' +
+    '<div class="chips"><span class="chip">'+name.split('.').pop().toUpperCase()+'</span>' +
+    '<span class="chip">'+size+'</span><span class="chip" id="durChip">загрузка...</span></div></div>' +
     '<button class="rm" onclick="removeVideo()">✕</button>';
   document.getElementById('toS2').style.display = 'inline-block';
   updateAnalyzeInfo();
-  // Захватываем кадр когда видео загружено
-  setTimeout(captureFrame, 500);
+  setTimeout(captureFrame, 800);
 }
 
-function onVideoMeta(v) {
-  state.videoDuration = v.duration;
-  var d = v.duration;
+function onVidMeta(v) {
+  state.videoDuration = v.duration || 0;
+  var d = v.duration || 0;
   var chip = document.getElementById('durChip');
-  if (chip) chip.textContent = Math.floor(d/60) + ':' + ('0'+Math.floor(d%60)).slice(-2);
+  if (chip) chip.textContent = Math.floor(d/60)+':'+(('0'+Math.floor(d%60)).slice(-2));
 }
 
 function captureFrame() {
   var v = document.getElementById('vidEl');
-  if (!v) return;
+  if (!v || !v.duration) return;
   try {
-    v.currentTime = Math.min(5, v.duration * 0.1 || 1);
-    v.addEventListener('seeked', function onSeeked() {
-      v.removeEventListener('seeked', onSeeked);
-      var cv = document.createElement('canvas');
-      cv.width = 320; cv.height = 180;
-      var ctx = cv.getContext('2d');
-      ctx.drawImage(v, 0, 0, 320, 180);
-      state.videoFrameB64 = cv.toDataURL('image/jpeg', 0.7).split(',')[1];
-      addLog('✓ Кадр видео захвачен для анализа');
-    }, { once: true });
-  } catch(e) { addLog('ℹ Кадр недоступен (URL-ссылка), анализ по имени файла'); }
+    v.currentTime = Math.min(3, (v.duration||10)*0.1);
+    v.addEventListener('seeked', function grabbed() {
+      v.removeEventListener('seeked', grabbed);
+      try {
+        var cv = document.createElement('canvas');
+        cv.width=320; cv.height=180;
+        cv.getContext('2d').drawImage(v,0,0,320,180);
+        state.videoFrameB64 = cv.toDataURL('image/jpeg',0.75).split(',')[1];
+        addLog('✓ Кадр захвачен для анализа');
+      } catch(e) { addLog('ℹ Кадр недоступен: '+e.message); }
+    }, {once:true});
+  } catch(e) { addLog('ℹ Кадр: '+e.message); }
 }
 
 function removeVideo() {
-  state.videoFile = null; state.videoUrl = null; state.videoName = '';
-  state.videoFrameB64 = null; state.videoAnalysis = null;
-  document.getElementById('vinfoWrap').style.display = 'none';
-  document.getElementById('toS2').style.display = 'none';
+  state.videoFile=null; state.videoUrl=null; state.videoName='';
+  state.videoFrameB64=null; state.videoAnalysis=null;
+  document.getElementById('vinfoWrap').style.display='none';
+  document.getElementById('toS2').style.display='none';
 }
 
 function fmtSize(b) {
-  if (b > 1e9) return (b/1e9).toFixed(2) + ' ГБ';
-  if (b > 1e6) return (b/1e6).toFixed(1) + ' МБ';
-  return (b/1e3).toFixed(0) + ' КБ';
+  if (b>1e9) return (b/1e9).toFixed(2)+' ГБ';
+  if (b>1e6) return (b/1e6).toFixed(1)+' МБ';
+  return (b/1e3).toFixed(0)+' КБ';
 }
 
 // ═══ НАСТРОЙКИ ════════════════════════════════════════════════
 function selRatio(r) {
-  state.ratio = r;
-  document.getElementById('r169').classList.toggle('sel', r === '16:9');
-  document.getElementById('r916').classList.toggle('sel', r === '9:16');
+  state.ratio=r;
+  document.getElementById('r169').classList.toggle('sel',r==='16:9');
+  document.getElementById('r916').classList.toggle('sel',r==='9:16');
   updateAnalyzeInfo();
 }
 
-function selAI(el, id) {
-  state.aiPlatform = id;
-  document.querySelectorAll('.ai-item').forEach(function(i) { i.classList.remove('sel'); });
+function selAI(el,id) {
+  state.aiPlatform=id;
+  document.querySelectorAll('.ai-item').forEach(function(i){i.classList.remove('sel');});
   el.classList.add('sel');
   var needKey = !AI_INFO[id].free;
-  document.getElementById('keyBlock').style.display = needKey ? 'block' : 'none';
+  document.getElementById('keyBlock').style.display = needKey?'block':'none';
   if (needKey) {
-    document.getElementById('keyLbl').textContent = 'API ключ для ' + AI_INFO[id].name;
-    var saved = localStorage.getItem('key_' + id);
-    if (saved) document.getElementById('apiKey').value = saved;
+    document.getElementById('keyLbl').textContent = 'API ключ для '+AI_INFO[id].name;
+    var saved=localStorage.getItem('key_'+id);
+    if (saved) document.getElementById('apiKey').value=saved;
   }
   updateAnalyzeInfo();
 }
 
-function selStyle(el, s) {
-  state.imgStyle = s;
-  document.querySelectorAll('.style-btn').forEach(function(b) { b.classList.remove('sel'); });
+function selStyle(el,s) {
+  state.imgStyle=s;
+  document.querySelectorAll('.style-btn').forEach(function(b){b.classList.remove('sel');});
   el.classList.add('sel');
   updateAnalyzeInfo();
 }
 
 function updateAnalyzeInfo() {
-  var ai = AI_INFO[state.aiPlatform] || { name: state.aiPlatform };
-  document.getElementById('analyzeInfoTxt').innerHTML =
-    'Платформа: <strong>' + ai.name + '</strong> · Формат: <strong>' + state.ratio +
-    '</strong> · Стиль: <strong>' + state.imgStyle + '</strong>';
+  var ai=AI_INFO[state.aiPlatform]||{name:state.aiPlatform};
+  document.getElementById('analyzeInfoTxt').innerHTML=
+    'Платформа: <strong>'+ai.name+'</strong> · Формат: <strong>'+state.ratio+
+    '</strong> · Стиль: <strong>'+state.imgStyle+'</strong>';
 }
 
-function toggleKey() {
-  var inp = document.getElementById('apiKey');
-  inp.type = inp.type === 'password' ? 'text' : 'password';
-}
-function saveKey() {
-  var k = document.getElementById('apiKey').value.trim();
-  if (k) { localStorage.setItem('key_' + state.aiPlatform, k); notify('Ключ сохранён', 'ok'); }
+function toggleKey() { var i=document.getElementById('apiKey'); i.type=i.type==='password'?'text':'password'; }
+function saveKey() { var k=document.getElementById('apiKey').value.trim(); if(k){localStorage.setItem('key_'+state.aiPlatform,k);notify('Ключ сохранён','ok');} }
+
+// ═══ ПРОКСИ ХЕЛПЕРЫ ══════════════════════════════════════════
+function getProxy() {
+  var p = document.getElementById('proxyInp') ? document.getElementById('proxyInp').value.trim() : '';
+  if (p) { PROXY_URL=p; localStorage.setItem('np_proxy',p); }
+  return PROXY_URL;
 }
 
-// ═══ ГЛАВНАЯ ГЕНЕРАЦИЯ ════════════════════════════════════════
+async function proxyPost(path, body, extraHeaders) {
+  var proxy = getProxy();
+  if (!proxy) throw new Error('Не указан URL прокси (Cloudflare Worker). Нажмите ⚙️ и введите URL.');
+  var headers = Object.assign({'Content-Type':'application/json'}, extraHeaders||{});
+  var resp = await fetch(proxy.replace(/\/$/, '')+path, {method:'POST', headers:headers, body:JSON.stringify(body)});
+  if (!resp.ok) {
+    var txt = await resp.text();
+    throw new Error('Прокси '+resp.status+': '+txt.substring(0,300));
+  }
+  return await resp.json();
+}
+
+// ═══ ГЕНЕРАЦИЯ ════════════════════════════════════════════════
 function startGeneration() {
   if (!state.videoFile && !state.videoUrl) { notify('Загрузите видео', 'err'); return; }
+  var proxy = getProxy();
+  if (!proxy) { showProxyModal(); return; }
   state.apiKey = document.getElementById('apiKey').value.trim();
   state.lang = document.getElementById('langSel').value;
   state.platform = document.getElementById('platSel').value;
   state.tone = document.getElementById('toneSel').value;
   var needKey = !AI_INFO[state.aiPlatform].free;
-  if (needKey && !state.apiKey) { notify('Введите API ключ для ' + AI_INFO[state.aiPlatform].name, 'err'); return; }
-  state.thumbUrls = [];
-  state.imagePrompts = [];
-  document.getElementById('thumbsGrid').innerHTML = '';
-  document.getElementById('titleOut').textContent = 'Нажмите «Создать»';
-  document.getElementById('titleOut').className = 'tk-out emp';
-  document.getElementById('descOut').textContent = 'Нажмите «Создать»';
-  document.getElementById('descOut').className = 'tk-out emp';
-  document.getElementById('tagsOut').innerHTML = '<span class="tag-emp">Нажмите «Создать»</span>';
+  if (needKey && !state.apiKey) { notify('Введите API ключ для '+AI_INFO[state.aiPlatform].name,'err'); return; }
+  state.thumbUrls=[]; state.imagePrompts=[];
+  document.getElementById('thumbsGrid').innerHTML='';
+  resetTextOutputs();
   goToStep(3);
   runGeneration();
 }
 
+function resetTextOutputs() {
+  ['titleOut','descOut'].forEach(function(id){
+    var el=document.getElementById(id);
+    if(el){el.textContent='Нажмите «Создать»';el.className='tk-out emp';}
+  });
+  document.getElementById('tagsOut').innerHTML='<span class="tag-emp">Нажмите «Создать»</span>';
+}
+
 async function runGeneration() {
-  var logEl = document.getElementById('logBox');
-  logEl.textContent = '';
+  document.getElementById('logBox').textContent='';
+  document.getElementById('pbarFill').style.width='0%';
+  [1,2,3,4,5,6].forEach(function(i){setStep(i,i===1?'cur':'wait');});
 
   try {
     // ШАГ 1: Анализ видео
-    setStep(1, 'cur'); addLog('Начинаем анализ видео: ' + state.videoName);
-    setPct(10);
-    var analysis = await analyzeVideoWithClaude();
+    addLog('Начинаем анализ: '+state.videoName);
+    setStep(1,'cur'); setPct(8);
+    var analysis = await analyzeVideo();
     state.videoAnalysis = analysis;
-    setStep(1, 'done'); setPct(25);
-    addLog('✓ Анализ завершён');
+    setStep(1,'done'); setPct(25);
+    addLog('✓ Анализ видео завершён');
+    addLog('Тема: '+analysis.substring(0,120)+'...');
 
-    // ШАГ 2: Создание промптов
-    setStep(2, 'cur'); addLog('Создаём промпты для генерации изображений...');
-    var prompts = await generateImagePrompts(analysis);
+    // ШАГ 2: Промпты для изображений
+    setStep(2,'cur'); setStep(3,'cur');
+    addLog('Создаём промпты для картинок...');
+    var count = parseInt(document.getElementById('countSel').value)||2;
+    var prompts = await makeImagePrompts(analysis, count);
     state.imagePrompts = prompts;
-    setStep(2, 'done'); setStep(3, 'done'); setPct(40);
-    addLog('✓ Промпты готовы: ' + prompts.length + ' вариантов');
+    setStep(2,'done'); setStep(3,'done'); setPct(40);
+    addLog('✓ Промпты готовы ('+prompts.length+' шт.)');
 
-    // ШАГ 3-4: Генерация изображений
-    var count = parseInt(document.getElementById('countSel').value) || 2;
-    var thumbUrls = [];
-    for (var i = 0; i < Math.min(count, prompts.length); i++) {
-      var stepId = i === 0 ? 4 : 5;
-      setStep(stepId, 'cur');
-      addLog('Генерация превью ' + (i+1) + '...');
-      addLog('Промпт: ' + prompts[i].substring(0, 100) + '...');
+    // ШАГ 3-4: Генерация картинок
+    for (var i=0; i<prompts.length; i++) {
+      var stepId = i===0?4:5;
+      setStep(stepId,'cur');
+      addLog('Генерация превью '+(i+1)+'/'+prompts.length+'...');
       try {
-        var url = await generateImage(prompts[i]);
-        thumbUrls.push({ url: url, prompt: prompts[i], label: 'Вариант ' + (i+1) });
-        setStep(stepId, 'done');
-        addLog('✓ Превью ' + (i+1) + ' готово');
+        var imgResult = await generateImage(prompts[i]);
+        state.thumbUrls.push({url:imgResult, prompt:prompts[i], label:'Вариант '+(i+1)});
+        setStep(stepId,'done');
+        addLog('✓ Превью '+(i+1)+' готово');
       } catch(imgErr) {
-        addLog('⚠ Ошибка генерации ' + (i+1) + ': ' + imgErr.message);
-        thumbUrls.push({ url: null, prompt: prompts[i], label: 'Вариант ' + (i+1), error: imgErr.message });
-        setStep(stepId, 'done');
+        addLog('⚠ Превью '+(i+1)+' — ошибка: '+imgErr.message);
+        state.thumbUrls.push({url:null, prompt:prompts[i], label:'Вариант '+(i+1), error:imgErr.message});
+        setStep(stepId,'done');
       }
-      setPct(40 + (i+1) * 20);
+      setPct(40+(i+1)*25);
     }
-    state.thumbUrls = thumbUrls;
 
     // ШАГ 5: Финал
-    setStep(6, 'done'); setPct(100);
-    addLog('✓ Всё готово!');
-    document.getElementById('progTitle').textContent = 'Готово!';
-
-    // Переходим к результатам
-    await new Promise(function(r) { setTimeout(r, 600); });
+    setStep(6,'done'); setPct(100);
+    addLog('✓ Готово!');
+    document.getElementById('progTitle').textContent='Готово!';
+    await sleep(500);
     renderResults();
     goToStep(4);
 
   } catch(e) {
-    addLog('❌ Ошибка: ' + e.message);
-    document.getElementById('progTitle').textContent = 'Ошибка';
-    notify('Ошибка: ' + e.message, 'err');
+    addLog('❌ '+e.message);
+    document.getElementById('progTitle').textContent='Ошибка';
+    notify('Ошибка: '+e.message,'err');
   }
 }
 
-// ═══ АНАЛИЗ ВИДЕО ЧЕРЕЗ CLAUDE ════════════════════════════════
-async function analyzeVideoWithClaude() {
-  addLog('Отправляем запрос в Claude...');
-  var messages = [];
+function sleep(ms){ return new Promise(function(r){setTimeout(r,ms);}); }
+
+// ═══ АНАЛИЗ ЧЕРЕЗ CLAUDE ══════════════════════════════════════
+async function analyzeVideo() {
+  var name = state.videoName.replace(/\.[^.]+$/,'').replace(/[-_]/g,' ');
+  var content = [];
   if (state.videoFrameB64) {
-    messages = [{
-      role: 'user',
-      content: [
-        { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: state.videoFrameB64 } },
-        { type: 'text', text: buildAnalysisPrompt() }
-      ]
-    }];
-  } else {
-    messages = [{ role: 'user', content: buildAnalysisPrompt() }];
+    content.push({type:'image',source:{type:'base64',media_type:'image/jpeg',data:state.videoFrameB64}});
   }
-  var resp = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 1000, messages: messages })
+  content.push({type:'text', text:
+    'Проанализируй это видео.\n'+
+    'Имя файла: '+name+'\n'+
+    (state.videoDuration ? 'Длительность: '+Math.round(state.videoDuration)+' сек\n' : '')+
+    (state.videoFrameB64 ? 'На изображении — реальный кадр из видео.\n' : '')+
+    'Определи:\n'+
+    '1. Основная тема и о чём видео (2-3 предложения)\n'+
+    '2. Что/кто изображён в кадре\n'+
+    '3. Жанр (туториал/влог/обзор/кулинария/спорт/новости/музыка/игры и т.д.)\n'+
+    '4. Настроение и атмосфера\n'+
+    '5. Ключевые слова темы\n'+
+    'Отвечай конкретно по содержимому. Не придумывай.'
   });
-  if (!resp.ok) throw new Error('Claude API: ' + resp.status);
-  var data = await resp.json();
-  var text = data.content && data.content[0] ? data.content[0].text : '';
-  addLog('Claude: ' + text.substring(0, 150));
-  return text;
+
+  var data = await proxyPost('/claude', {
+    model:'claude-sonnet-4-6',
+    max_tokens:800,
+    messages:[{role:'user', content: state.videoFrameB64 ? content : content[0].text}]
+  });
+
+  if (data.error) throw new Error('Claude: '+data.error);
+  return data.content && data.content[0] ? data.content[0].text : '';
 }
 
-function buildAnalysisPrompt() {
-  var name = state.videoName.replace(/\.[^.]+$/, '').replace(/[-_]/g, ' ');
-  var dur = state.videoDuration ? Math.round(state.videoDuration) + ' сек' : 'неизвестно';
-  return 'Проанализируй это видео.\n' +
-    'Название файла: ' + name + '\n' +
-    'Длительность: ' + dur + '\n' +
-    (state.videoFrameB64 ? 'На изображении — кадр из видео.\n' : '') +
-    'Определи:\n' +
-    '1. Основная тема и содержание видео (2-3 предложения)\n' +
-    '2. Ключевые объекты/люди/места в кадре\n' +
-    '3. Настроение и атмосфера\n' +
-    '4. Жанр (обзор/туториал/влог/новости/развлечение/спорт/кулинария и т.д.)\n' +
-    '5. Целевая аудитория\n' +
-    'Отвечай конкретно и кратко. Используй эту информацию для создания превью.';
-}
-
-// ═══ ГЕНЕРАЦИЯ ПРОМПТОВ ═══════════════════════════════════════
-async function generateImagePrompts(analysis) {
-  var name = state.videoName.replace(/\.[^.]+$/, '').replace(/[-_]/g, ' ');
-  var count = parseInt(document.getElementById('countSel').value) || 2;
-  var promptRequest = 'На основе анализа видео создай ' + count + ' разных промпта для генерации thumbnail (превью) для видео.\n\n' +
-    'Анализ видео:\n' + analysis + '\n\n' +
-    'Название видео: ' + name + '\n' +
-    'Стиль изображения: ' + state.imgStyle + '\n' +
-    'Соотношение сторон: ' + state.ratio + '\n\n' +
-    'Требования к каждому промпту:\n' +
-    '- На английском языке (для API генерации)\n' +
-    '- Детально описывай визуальные элементы\n' +
-    '- Укажи стиль: ' + state.imgStyle + ', high quality, sharp, detailed\n' +
-    '- Промпт должен создавать привлекательную картинку-превью\n' +
-    '- Каждый вариант должен быть разным по композиции\n\n' +
-    'Верни ТОЛЬКО промпты, по одному на строку, без нумерации и пояснений.';
-
-  var resp = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 800,
-      messages: [{ role: 'user', content: promptRequest }] })
+// ═══ ПРОМПТЫ ДЛЯ КАРТИНОК ════════════════════════════════════
+async function makeImagePrompts(analysis, count) {
+  var name = state.videoName.replace(/\.[^.]+$/,'').replace(/[-_]/g,' ');
+  var data = await proxyPost('/claude', {
+    model:'claude-sonnet-4-6',
+    max_tokens:600,
+    messages:[{role:'user', content:
+      'На основе анализа видео создай '+count+' промпта на английском языке для генерации thumbnail.\n\n'+
+      'Анализ:\n'+analysis+'\n\n'+
+      'Название файла: '+name+'\n'+
+      'Стиль: '+state.imgStyle+', high quality, sharp, vibrant colors\n'+
+      'Формат: '+state.ratio+'\n\n'+
+      'Требования:\n'+
+      '- На английском языке\n'+
+      '- Каждый промпт описывает привлекательную обложку для видео\n'+
+      '- Разные композиции и акценты\n'+
+      '- Укажи стиль и качество\n'+
+      '- YouTube thumbnail style, eye-catching\n\n'+
+      'Верни ТОЛЬКО промпты — по одному на строку, без нумерации и пояснений.'
+    }]
   });
-  if (!resp.ok) throw new Error('Claude prompts: ' + resp.status);
-  var data = await resp.json();
+
+  if (data.error) throw new Error('Claude промпты: '+data.error);
   var text = data.content && data.content[0] ? data.content[0].text : '';
-  var lines = text.split('\n').map(function(l) { return l.trim(); }).filter(function(l) { return l.length > 20; });
-  if (!lines.length) lines = ['cinematic thumbnail, ' + name + ', ' + state.imgStyle + ', high quality, 4k'];
-  return lines.slice(0, count);
+  var lines = text.split('\n').map(function(l){return l.trim();}).filter(function(l){return l.length>15;});
+  if (!lines.length) lines = [name+', '+state.imgStyle+', thumbnail, high quality, 4k, eye-catching'];
+  return lines.slice(0,count);
 }
 
 // ═══ ГЕНЕРАЦИЯ ИЗОБРАЖЕНИЙ ════════════════════════════════════
 async function generateImage(prompt) {
-  var fullPrompt = prompt + ', thumbnail, ' + state.ratio.replace(':','x') + ' aspect ratio';
-  switch (state.aiPlatform) {
-    case 'hf':     return await genHuggingFace(fullPrompt);
-    case 'nano':   return await genNanoGPT(fullPrompt);
-    case 'gemini': return await genGemini(fullPrompt);
-    case 'dalle':  return await genDallE(fullPrompt);
-    case 'stab':   return await genStability(fullPrompt);
-    default: throw new Error('Неизвестная платформа: ' + state.aiPlatform);
+  var fullPrompt = prompt + ', thumbnail, professional, high quality';
+  switch(state.aiPlatform) {
+    case 'hf':     return await imgHuggingFace(fullPrompt);
+    case 'nano':   return await imgPollinations(fullPrompt);
+    case 'gemini': return await imgGemini(fullPrompt);
+    case 'dalle':  return await imgDallE(fullPrompt);
+    case 'stab':   return await imgStability(fullPrompt);
+    default: throw new Error('Неизвестная платформа');
   }
 }
 
-// Hugging Face — FLUX.1-schnell (бесплатно без ключа)
-async function genHuggingFace(prompt) {
-  var w = state.ratio === '9:16' ? 576 : 1024;
-  var h = state.ratio === '9:16' ? 1024 : 576;
-  addLog('HuggingFace FLUX: запрос...');
-  var resp = await fetch('https://api-inference.huggingface.co/models/black-forest-labs/FLUX.1-schnell', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(state.apiKey ? { 'Authorization': 'Bearer ' + state.apiKey } : {})
-    },
-    body: JSON.stringify({ inputs: prompt, parameters: { width: w, height: h, num_inference_steps: 4 } })
-  });
-  if (!resp.ok) {
-    var errText = await resp.text();
-    throw new Error('HF API ' + resp.status + ': ' + errText.substring(0, 200));
-  }
-  var blob = await resp.blob();
-  return URL.createObjectURL(blob);
+async function imgHuggingFace(prompt) {
+  var isPort = state.ratio==='9:16';
+  var data = await proxyPost('/huggingface', {
+    model: 'black-forest-labs/FLUX.1-schnell',
+    prompt: prompt,
+    parameters: { width: isPort?576:1024, height: isPort?1024:576, num_inference_steps:4 }
+  }, state.apiKey ? {'x-hf-key': state.apiKey} : {});
+  if (data.error) throw new Error('HuggingFace: '+data.error);
+  return 'data:image/png;base64,'+data.image;
 }
 
-// NanoGPT / NanoБанан — через Pollinations (реально бесплатный)
-async function genNanoGPT(prompt) {
-  var w = state.ratio === '9:16' ? 576 : 1280;
-  var h = state.ratio === '9:16' ? 1024 : 720;
-  addLog('NanoБанан (Pollinations): запрос...');
-  var encoded = encodeURIComponent(prompt);
-  var url = 'https://image.pollinations.ai/prompt/' + encoded + '?width=' + w + '&height=' + h + '&nologo=true&seed=' + Math.floor(Math.random()*99999);
-  // Проверяем что картинка загрузилась
-  return new Promise(function(resolve, reject) {
-    var img = new Image();
-    img.crossOrigin = 'anonymous';
-    img.onload = function() { resolve(url); };
-    img.onerror = function() { reject(new Error('Pollinations не ответил')); };
-    img.src = url;
-    setTimeout(function() { reject(new Error('Timeout 30s')); }, 30000);
+async function imgPollinations(prompt) {
+  var isPort = state.ratio==='9:16';
+  var data = await proxyPost('/pollinations', {
+    prompt: prompt,
+    width: isPort?576:1280,
+    height: isPort?1024:720
   });
+  if (data.error) throw new Error('Pollinations: '+data.error);
+  return 'data:image/jpeg;base64,'+data.image;
 }
 
-// Google Gemini Imagen
-async function genGemini(prompt) {
+async function imgGemini(prompt) {
   if (!state.apiKey) throw new Error('Нужен Google API ключ');
-  addLog('Gemini Imagen: запрос...');
-  var resp = await fetch('https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-001:predict?key=' + state.apiKey, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      instances: [{ prompt: prompt }],
-      parameters: { sampleCount: 1, aspectRatio: state.ratio === '9:16' ? '9:16' : '16:9' }
-    })
-  });
-  if (!resp.ok) { var e = await resp.json(); throw new Error('Gemini: ' + (e.error && e.error.message || resp.status)); }
-  var data = await resp.json();
-  var b64 = data.predictions && data.predictions[0] && data.predictions[0].bytesBase64Encoded;
+  var data = await proxyPost('/gemini', {
+    instances:[{prompt:prompt}],
+    parameters:{sampleCount:1, aspectRatio:state.ratio==='9:16'?'9:16':'16:9'}
+  }, {'x-gemini-key':state.apiKey});
+  if (data.error) throw new Error('Gemini: '+(data.error.message||JSON.stringify(data.error)));
+  var b64 = data.predictions&&data.predictions[0]&&data.predictions[0].bytesBase64Encoded;
   if (!b64) throw new Error('Gemini: пустой ответ');
-  return 'data:image/png;base64,' + b64;
+  return 'data:image/png;base64,'+b64;
 }
 
-// OpenAI DALL-E 3
-async function genDallE(prompt) {
+async function imgDallE(prompt) {
   if (!state.apiKey) throw new Error('Нужен OpenAI API ключ');
-  addLog('DALL·E 3: запрос...');
-  var size = state.ratio === '9:16' ? '1024x1792' : '1792x1024';
-  var resp = await fetch('https://api.openai.com/v1/images/generations', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + state.apiKey },
-    body: JSON.stringify({ model: 'dall-e-3', prompt: prompt, n: 1, size: size, quality: 'standard' })
-  });
-  if (!resp.ok) { var e = await resp.json(); throw new Error('DALL·E: ' + (e.error && e.error.message || resp.status)); }
-  var data = await resp.json();
-  return data.data && data.data[0] && data.data[0].url;
+  var size = state.ratio==='9:16'?'1024x1792':'1792x1024';
+  var data = await proxyPost('/openai', {model:'dall-e-3',prompt:prompt,n:1,size:size,quality:'standard'},
+    {'x-openai-key':state.apiKey});
+  if (data.error) throw new Error('DALL·E: '+(data.error.message||JSON.stringify(data.error)));
+  return data.data&&data.data[0]&&data.data[0].url;
 }
 
-// Stability AI SDXL
-async function genStability(prompt) {
-  if (!state.apiKey) throw new Error('Нужен Stability AI API ключ');
-  addLog('Stability AI: запрос...');
-  var w = state.ratio === '9:16' ? 576 : 1024;
-  var h = state.ratio === '9:16' ? 1024 : 576;
-  var resp = await fetch('https://api.stability.ai/v1/generation/stable-diffusion-xl-1024-v1-0/text-to-image', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + state.apiKey, 'Accept': 'application/json' },
-    body: JSON.stringify({ text_prompts: [{ text: prompt, weight: 1 }], width: w, height: h, steps: 30, samples: 1 })
-  });
-  if (!resp.ok) { var e = await resp.json(); throw new Error('Stability: ' + (e.message || resp.status)); }
-  var data = await resp.json();
-  var b64 = data.artifacts && data.artifacts[0] && data.artifacts[0].base64;
+async function imgStability(prompt) {
+  if (!state.apiKey) throw new Error('Нужен Stability AI ключ');
+  var isPort = state.ratio==='9:16';
+  var data = await proxyPost('/stability',
+    {text_prompts:[{text:prompt,weight:1}], width:isPort?576:1024, height:isPort?1024:576, steps:30, samples:1},
+    {'x-stability-key':state.apiKey});
+  if (data.message) throw new Error('Stability: '+data.message);
+  var b64 = data.artifacts&&data.artifacts[0]&&data.artifacts[0].base64;
   if (!b64) throw new Error('Stability: пустой ответ');
-  return 'data:image/png;base64,' + b64;
+  return 'data:image/png;base64,'+b64;
 }
 
-// ═══ РЕНДЕР РЕЗУЛЬТАТОВ ══════════════════════════════════════
+// ═══ РЕНДЕР РЕЗУЛЬТАТОВ ═══════════════════════════════════════
 function renderResults() {
   var grid = document.getElementById('thumbsGrid');
-  grid.innerHTML = '';
-  var isPort = state.ratio === '9:16';
-  state.thumbUrls.forEach(function(th, i) {
-    var card = document.createElement('div');
-    card.className = 'th-card';
+  grid.innerHTML='';
+  var isPort = state.ratio==='9:16';
+  state.thumbUrls.forEach(function(th,i) {
+    var card=document.createElement('div'); card.className='th-card';
     if (th.url) {
-      card.innerHTML =
-        '<div class="th-img-wrap" style="aspect-ratio:' + (isPort ? '9/16' : '16/9') + '">' +
-        '<img src="' + th.url + '" alt="' + th.label + '" loading="lazy">' +
-        '<div class="th-overlay">' +
-        '<button class="th-btn" onclick="dlSingle(' + i + ',\'png\')">⬇ PNG</button>' +
-        '<button class="th-btn" onclick="dlSingle(' + i + ',\'jpg\')">⬇ JPG</button>' +
-        '</div></div>' +
-        '<div class="th-footer"><div class="th-name">' + th.label + '</div>' +
-        '<div class="th-meta"><span class="th-badge">' + state.ratio + '</span>' +
-        '<span class="th-badge">' + (AI_INFO[state.aiPlatform] || {name:state.aiPlatform}).name + '</span>' +
-        '<span class="th-badge">' + state.imgStyle + '</span></div></div>';
+      card.innerHTML=
+        '<div class="th-img-wrap" style="aspect-ratio:'+(isPort?'9/16':'16/9')+'">'+
+        '<img src="'+th.url+'" alt="'+th.label+'" loading="lazy" style="width:100%;height:100%;object-fit:cover">'+
+        '<div class="th-overlay">'+
+        '<button class="th-btn" onclick="dlOne('+i+',\'png\')">⬇ PNG</button>'+
+        '<button class="th-btn" onclick="dlOne('+i+',\'jpg\')">⬇ JPG</button>'+
+        '</div></div>'+
+        '<div class="th-footer"><div class="th-name">'+th.label+'</div>'+
+        '<div class="th-meta">'+
+        '<span class="th-badge">'+state.ratio+'</span>'+
+        '<span class="th-badge">'+AI_INFO[state.aiPlatform].name+'</span>'+
+        '</div></div>';
     } else {
-      card.innerHTML =
-        '<div class="th-img-wrap" style="aspect-ratio:' + (isPort ? '9/16' : '16/9') + '">' +
-        '<div class="gen-placeholder">❌<div style="font-size:11px;text-align:center;max-width:200px">' + (th.error || 'Ошибка генерации') + '</div>' +
-        '<button class="btn" style="font-size:12px;padding:6px 14px;margin-top:8px" onclick="regenSingle(' + i + ')">Повторить</button>' +
-        '</div></div>' +
-        '<div class="th-footer"><div class="th-name">' + th.label + '</div></div>';
+      card.innerHTML=
+        '<div class="th-img-wrap" style="aspect-ratio:'+(isPort?'9/16':'16/9')+'">'+
+        '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:10px;padding:1rem;color:var(--t3)">'+
+        '<div style="font-size:13px;text-align:center">❌ '+(th.error||'Ошибка')+'</div>'+
+        '<button class="btn" style="font-size:12px;padding:6px 14px" onclick="regenOne('+i+')">🔁 Повторить</button>'+
+        '</div></div>'+
+        '<div class="th-footer"><div class="th-name">'+th.label+' (ошибка)</div></div>';
     }
     grid.appendChild(card);
   });
-  document.getElementById('resSub').textContent = state.videoName + ' · ' + AI_INFO[state.aiPlatform].name + ' · ' + state.ratio;
-  // Сохраняем в историю
-  var entry = { name: state.videoName, date: new Date().toLocaleString('ru'), ai: state.aiPlatform };
+  document.getElementById('resSub').textContent = state.videoName+' · '+AI_INFO[state.aiPlatform].name+' · '+state.ratio;
+  var entry={name:state.videoName, date:new Date().toLocaleString('ru'), ai:state.aiPlatform};
   state.history.unshift(entry);
-  if (state.history.length > 20) state.history.pop();
-  localStorage.setItem('np_history', JSON.stringify(state.history));
-}
-
-// ═══ ГЕНЕРАЦИЯ ТЕКСТОВ ЧЕРЕЗ CLAUDE ══════════════════════════
-var currentTextPlatform = 'YouTube';
-
-function selPlatText(btn, plat) {
-  currentTextPlatform = plat;
-  document.querySelectorAll('.plat-btn').forEach(function(b) { b.classList.remove('sel'); });
-  btn.classList.add('sel');
-}
-
-async function callClaudeText(prompt) {
-  var resp = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 1000,
-      messages: [{ role: 'user', content: prompt }] })
-  });
-  if (!resp.ok) throw new Error('Claude: ' + resp.status);
-  var data = await resp.json();
-  return data.content && data.content[0] ? data.content[0].text : '';
-}
-
-function getVideoContext() {
-  var name = state.videoName.replace(/\.[^.]+$/, '').replace(/[-_]/g, ' ');
-  return 'Видео: "' + name + '"\n' +
-    (state.videoAnalysis ? 'Анализ содержимого:\n' + state.videoAnalysis + '\n' : '') +
-    'Платформа: ' + currentTextPlatform + '\n' +
-    'Язык ответа: ' + state.lang + '\n' +
-    'Тон: ' + state.tone + '\n';
-}
-
-async function genTitle() {
-  var el = document.getElementById('titleOut');
-  el.className = 'tk-out loading'; el.textContent = '✨ Генерирую...';
-  try {
-    var prompt = getVideoContext() +
-      '\nСоздай ONE цепляющий заголовок для этого видео на ' + state.lang + ' языке.\n' +
-      'Требования: максимум 100 символов, содержит ключевые слова, вызывает желание кликнуть.\n' +
-      'Верни ТОЛЬКО заголовок, без кавычек и пояснений.';
-    var result = await callClaudeText(prompt);
-    el.textContent = result.trim();
-    el.className = 'tk-out';
-    notify('Название создано', 'ok');
-  } catch(e) {
-    el.textContent = 'Ошибка: ' + e.message;
-    el.className = 'tk-out';
-    notify('Ошибка: ' + e.message, 'err');
-  }
-}
-
-async function genDesc() {
-  var el = document.getElementById('descOut');
-  el.className = 'tk-out loading'; el.textContent = '✨ Генерирую...';
-  try {
-    var platInstr = {
-      'YouTube': 'Включи тайм-коды (00:00 Введение, и т.д.), призыв подписаться и поставить лайк.',
-      'Instagram': 'Короткое (3-5 строк), живой стиль, эмодзи, призыв сохранить.',
-      'TikTok': 'Очень короткое (1-3 строки), вирусный стиль, хук в начале.',
-      'ВКонтакте': 'Развёрнутое, информативное, без лишних эмодзи.',
-      'Telegram': 'Структурированное, с эмодзи-маркерами, призыв к обсуждению.'
-    }[currentTextPlatform] || '';
-    var prompt = getVideoContext() +
-      '\nНапиши описание для этого видео на ' + state.lang + ' языке для ' + currentTextPlatform + '.\n' +
-      platInstr + '\n' +
-      'Описание должно точно отражать содержимое видео. Верни ТОЛЬКО текст описания.';
-    var result = await callClaudeText(prompt);
-    el.textContent = result.trim();
-    el.className = 'tk-out';
-    notify('Описание создано', 'ok');
-  } catch(e) {
-    el.textContent = 'Ошибка: ' + e.message;
-    el.className = 'tk-out';
-    notify('Ошибка: ' + e.message, 'err');
-  }
-}
-
-async function genTags() {
-  var wrap = document.getElementById('tagsOut');
-  wrap.innerHTML = '<span class="tag-emp" style="opacity:.5">✨ Генерирую...</span>';
-  try {
-    var prompt = getVideoContext() +
-      '\nСоздай 15-20 хэштегов и ключевых слов для этого видео на ' + state.lang + ' языке.\n' +
-      'Формат: каждый тег начинается с # и через пробел. Только теги, без пояснений.\n' +
-      'Теги должны точно соответствовать содержимому видео.';
-    var result = await callClaudeText(prompt);
-    var tags = result.trim().split(/\s+/).filter(function(t) { return t.startsWith('#') && t.length > 1; });
-    if (!tags.length) {
-      tags = result.trim().split(/[,\n]/).map(function(t) { return t.trim(); })
-        .filter(function(t) { return t.length > 1; })
-        .map(function(t) { return t.startsWith('#') ? t : '#'+t; });
-    }
-    wrap.innerHTML = tags.map(function(t) {
-      return '<span class="tag" onclick="this.classList.toggle(\'sel\')">' + t + '</span>';
-    }).join('');
-    if (!wrap.children.length) wrap.innerHTML = '<span class="tag-emp">Не удалось создать теги</span>';
-    notify('Теги созданы', 'ok');
-  } catch(e) {
-    wrap.innerHTML = '<span class="tag-emp">Ошибка: ' + e.message + '</span>';
-    notify('Ошибка: ' + e.message, 'err');
-  }
+  if (state.history.length>20) state.history.pop();
+  localStorage.setItem('np_history',JSON.stringify(state.history));
 }
 
 // ═══ СКАЧИВАНИЕ ═══════════════════════════════════════════════
-function dlSingle(idx, fmt) {
-  var th = state.thumbUrls[idx];
-  if (!th || !th.url) { notify('Картинка не готова', 'err'); return; }
-  if (th.url.startsWith('blob:') || th.url.startsWith('data:') || th.url.startsWith('https://image.pollinations')) {
-    fetchAndDownload(th.url, 'thumbnail_' + (idx+1) + '_' + state.ratio.replace(':','x') + '.' + fmt);
+function dlOne(idx, fmt) {
+  var th=state.thumbUrls[idx]; if(!th||!th.url){notify('Нет изображения','err');return;}
+  if (th.url.startsWith('data:')) {
+    // Конвертируем в нужный формат
+    var cv=document.createElement('canvas');
+    var img=new Image();
+    img.onload=function(){
+      cv.width=img.width; cv.height=img.height;
+      cv.getContext('2d').drawImage(img,0,0);
+      var mime=fmt==='jpg'?'image/jpeg':'image/png';
+      var a=document.createElement('a');
+      a.href=cv.toDataURL(mime,0.92);
+      a.download='thumbnail_'+(idx+1)+'_'+state.ratio.replace(':','x')+'.'+fmt;
+      a.click();
+      notify('Скачано: thumbnail_'+(idx+1)+'.'+fmt,'ok');
+    };
+    img.src=th.url;
   } else {
-    fetchAndDownload(th.url, 'thumbnail_' + (idx+1) + '.' + fmt);
+    window.open(th.url,'_blank');
+    notify('Открыто в новой вкладке','ok');
   }
-}
-
-function fetchAndDownload(url, filename) {
-  if (url.startsWith('data:')) {
-    var a = document.createElement('a'); a.href = url; a.download = filename; a.click();
-    notify('Скачивание...', 'ok'); return;
-  }
-  fetch(url).then(function(r) { return r.blob(); }).then(function(blob) {
-    var a = document.createElement('a');
-    a.href = URL.createObjectURL(blob); a.download = filename; a.click();
-    notify('Скачано: ' + filename, 'ok');
-  }).catch(function(e) {
-    // Если CORS — открываем в новой вкладке
-    window.open(url, '_blank');
-    notify('Открыто в новой вкладке (CORS)', 'warn');
-  });
 }
 
 function downloadAll(fmt) {
-  state.thumbUrls.forEach(function(th, i) { if (th.url) setTimeout(function() { dlSingle(i, fmt); }, i * 600); });
+  state.thumbUrls.forEach(function(_,i){setTimeout(function(){dlOne(i,fmt);},i*500);});
 }
 
-async function regenSingle(idx) {
-  if (!state.imagePrompts[idx]) { notify('Промпт не найден', 'err'); return; }
-  var grid = document.getElementById('thumbsGrid');
-  var cards = grid.children;
+async function regenOne(idx) {
+  if (!state.imagePrompts[idx]) {notify('Промпт не найден','err');return;}
+  var cards=document.getElementById('thumbsGrid').children;
   if (cards[idx]) {
-    var wrap = cards[idx].querySelector('.th-img-wrap');
-    if (wrap) wrap.innerHTML = '<div class="gen-placeholder"><div class="gen-spin"></div><div>Генерирую...</div></div>';
+    var wrap=cards[idx].querySelector('.th-img-wrap');
+    if (wrap) wrap.innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--t2)"><div class="spinner"></div>&nbsp;Генерирую...</div>';
   }
   try {
-    var url = await generateImage(state.imagePrompts[idx]);
-    state.thumbUrls[idx].url = url;
-    state.thumbUrls[idx].error = null;
-    renderResults();
-    notify('Превью ' + (idx+1) + ' перегенерировано', 'ok');
+    var url=await generateImage(state.imagePrompts[idx]);
+    state.thumbUrls[idx]={url:url,prompt:state.imagePrompts[idx],label:'Вариант '+(idx+1)};
+    renderResults(); notify('Превью '+(idx+1)+' готово','ok');
   } catch(e) {
-    state.thumbUrls[idx].error = e.message;
-    renderResults();
-    notify('Ошибка: ' + e.message, 'err');
+    state.thumbUrls[idx].error=e.message;
+    renderResults(); notify('Ошибка: '+e.message,'err');
   }
 }
 
 async function regenThumbs() {
-  notify('Перегенерация...', 'ok');
-  state.thumbUrls = [];
-  var grid = document.getElementById('thumbsGrid');
-  state.imagePrompts.forEach(function(_, i) {
-    var card = document.createElement('div');
-    card.className = 'th-card';
-    card.innerHTML = '<div class="th-img-wrap" style="aspect-ratio:' + (state.ratio==='9:16'?'9/16':'16/9') + '">' +
-      '<div class="gen-placeholder"><div class="gen-spin"></div><div>Генерирую ' + (i+1) + '...</div></div></div>';
-    if (i === 0) grid.innerHTML = '';
-    grid.appendChild(card);
-  });
-  for (var i = 0; i < state.imagePrompts.length; i++) {
-    try {
-      var url = await generateImage(state.imagePrompts[i]);
-      state.thumbUrls.push({ url: url, prompt: state.imagePrompts[i], label: 'Вариант ' + (i+1) });
-    } catch(e) {
-      state.thumbUrls.push({ url: null, prompt: state.imagePrompts[i], label: 'Вариант ' + (i+1), error: e.message });
-    }
-  }
+  if (!state.imagePrompts.length){notify('Сначала запустите генерацию','err');return;}
+  notify('Перегенерация...','ok');
+  state.thumbUrls=[];
   renderResults();
+  for (var i=0;i<state.imagePrompts.length;i++) {
+    try {
+      var url=await generateImage(state.imagePrompts[i]);
+      state.thumbUrls.push({url:url,prompt:state.imagePrompts[i],label:'Вариант '+(i+1)});
+    } catch(e) {
+      state.thumbUrls.push({url:null,prompt:state.imagePrompts[i],label:'Вариант '+(i+1),error:e.message});
+    }
+    renderResults();
+  }
 }
 
 function copyPrompts() {
-  var txt = state.imagePrompts.join('\n\n');
-  if (txt) navigator.clipboard.writeText(txt).then(function() { notify('Промпты скопированы', 'ok'); });
+  var txt=state.imagePrompts.join('\n\n');
+  if(txt) navigator.clipboard.writeText(txt).then(function(){notify('Промпты скопированы','ok');});
+  else notify('Промпты не сгенерированы','err');
+}
+
+// ═══ ТЕКСТЫ ЧЕРЕЗ CLAUDE ══════════════════════════════════════
+var currentPlatText='YouTube';
+function selPlatText(btn,plat) {
+  currentPlatText=plat;
+  document.querySelectorAll('.plat-btn').forEach(function(b){b.classList.remove('sel');});
+  btn.classList.add('sel');
+}
+
+function getCtx() {
+  return 'Видео: "'+state.videoName.replace(/\.[^.]+$/,'').replace(/[-_]/g,' ')+'"\n'+
+    (state.videoAnalysis?'Анализ:\n'+state.videoAnalysis+'\n':'')+
+    'Платформа: '+currentPlatText+'\nЯзык: '+state.lang+'\nТон: '+state.tone+'\n';
+}
+
+async function claudeText(prompt) {
+  var data = await proxyPost('/claude',{
+    model:'claude-sonnet-4-6', max_tokens:1000,
+    messages:[{role:'user',content:prompt}]
+  });
+  if (data.error) throw new Error(data.error);
+  return data.content&&data.content[0]?data.content[0].text:'';
+}
+
+async function genTitle() {
+  var el=document.getElementById('titleOut');
+  el.className='tk-out loading'; el.textContent='✨ Генерирую через Claude...';
+  try {
+    var result=await claudeText(getCtx()+
+      '\nСоздай один цепляющий заголовок на '+state.lang+' языке для '+currentPlatText+'.\n'+
+      'Максимум 100 символов. Содержит ключевые слова темы. Вызывает желание кликнуть.\n'+
+      'Верни ТОЛЬКО заголовок, без кавычек, скобок и пояснений.');
+    el.textContent=result.trim().replace(/^["«]|["»]$/g,'');
+    el.className='tk-out';
+    notify('Название создано','ok');
+  } catch(e) {
+    el.textContent='Ошибка: '+e.message; el.className='tk-out';
+    notify('Ошибка: '+e.message,'err');
+  }
+}
+
+async function genDesc() {
+  var el=document.getElementById('descOut');
+  el.className='tk-out loading'; el.textContent='✨ Генерирую через Claude...';
+  try {
+    var platHint={
+      'YouTube':'Включи тайм-коды (00:00 Вступление, 01:30 Основная часть и т.д.), призыв лайкнуть и подписаться.',
+      'Instagram':'3-5 коротких строк, живой стиль, эмодзи, призыв сохранить.',
+      'TikTok':'1-3 строки максимум, вирусный стиль, хук с первых слов.',
+      'ВКонтакте':'Развёрнутое, информативное, без лишних эмодзи.',
+      'Telegram':'Структурированное, с эмодзи-маркерами.'
+    }[currentPlatText]||'';
+    var result=await claudeText(getCtx()+
+      '\nНапиши описание для '+currentPlatText+' на '+state.lang+' языке.\n'+
+      platHint+'\nОписание должно точно отражать тему видео. Верни ТОЛЬКО текст описания.');
+    el.textContent=result.trim();
+    el.className='tk-out';
+    notify('Описание создано','ok');
+  } catch(e) {
+    el.textContent='Ошибка: '+e.message; el.className='tk-out';
+    notify('Ошибка: '+e.message,'err');
+  }
+}
+
+async function genTags() {
+  var wrap=document.getElementById('tagsOut');
+  wrap.innerHTML='<span class="tag-emp" style="opacity:.5">✨ Генерирую теги через Claude...</span>';
+  try {
+    var result=await claudeText(getCtx()+
+      '\nСоздай 15-20 хэштегов для этого видео на '+state.lang+' языке.\n'+
+      'Формат: каждый начинается с # через пробел.\n'+
+      'Только теги без пояснений. Точно по теме видео.');
+    var tags=result.trim().split(/\s+/).filter(function(t){return t.startsWith('#')&&t.length>1;});
+    if (!tags.length) {
+      tags=result.split(/[\n,]/).map(function(t){return t.trim();})
+        .filter(function(t){return t.length>1;})
+        .map(function(t){return t.startsWith('#')?t:'#'+t;});
+    }
+    if (tags.length) {
+      wrap.innerHTML=tags.map(function(t){
+        return '<span class="tag" onclick="this.classList.toggle(\'sel\')">'+t+'</span>';
+      }).join('');
+      notify('Теги созданы','ok');
+    } else {
+      wrap.innerHTML='<span class="tag-emp">Не удалось создать теги</span>';
+    }
+  } catch(e) {
+    wrap.innerHTML='<span class="tag-emp">Ошибка: '+e.message+'</span>';
+    notify('Ошибка: '+e.message,'err');
+  }
 }
 
 // ═══ ЭКСПОРТ ТЕКСТОВ ══════════════════════════════════════════
 function copyField(id) {
-  var t = document.getElementById(id).textContent;
-  if (t && !t.includes('Нажмите') && !t.includes('Генерирую') && !t.includes('Ошибка'))
-    navigator.clipboard.writeText(t).then(function() { notify('Скопировано!', 'ok'); });
+  var t=document.getElementById(id).textContent;
+  if (t&&!t.includes('Нажмите')&&!t.includes('Генерирую')&&!t.includes('Ошибка'))
+    navigator.clipboard.writeText(t).then(function(){notify('Скопировано!','ok');});
+  else notify('Сначала создайте текст','err');
 }
 
 function copyTags() {
-  var tags = Array.from(document.querySelectorAll('#tagsOut .tag')).map(function(t) { return t.textContent; }).join(' ');
-  if (tags) navigator.clipboard.writeText(tags).then(function() { notify('Теги скопированы!', 'ok'); });
+  var tags=Array.from(document.querySelectorAll('#tagsOut .tag')).map(function(t){return t.textContent;}).join(' ');
+  if (tags) navigator.clipboard.writeText(tags).then(function(){notify('Теги скопированы!','ok');});
+  else notify('Сначала создайте теги','err');
 }
 
 function expTexts(type) {
-  var title = document.getElementById('titleOut').textContent;
-  var desc = document.getElementById('descOut').textContent;
-  var tags = Array.from(document.querySelectorAll('#tagsOut .tag')).map(function(t) { return t.textContent; }).join(' ');
-  if (type === 'copy') {
-    navigator.clipboard.writeText('НАЗВАНИЕ:\n' + title + '\n\nОПИСАНИЕ:\n' + desc + '\n\nТЕГИ:\n' + tags)
-      .then(function() { notify('Всё скопировано!', 'ok'); });
+  var title=document.getElementById('titleOut').textContent;
+  var desc=document.getElementById('descOut').textContent;
+  var tags=Array.from(document.querySelectorAll('#tagsOut .tag')).map(function(t){return t.textContent;}).join(' ');
+  if (type==='copy'){
+    navigator.clipboard.writeText('НАЗВАНИЕ:\n'+title+'\n\nОПИСАНИЕ:\n'+desc+'\n\nТЕГИ:\n'+tags)
+      .then(function(){notify('Всё скопировано!','ok');});
     return;
   }
-  var content = '', ext = 'txt';
-  if (type === 'json') { content = JSON.stringify({ title: title, description: desc, tags: tags, platform: currentTextPlatform, video: state.videoName }, null, 2); ext = 'json'; }
-  else if (type === 'md') { content = '# ' + title + '\n\n## Описание\n' + desc + '\n\n## Теги\n' + tags; ext = 'md'; }
-  else content = 'НАЗВАНИЕ:\n' + title + '\n\nОПИСАНИЕ:\n' + desc + '\n\nТЕГИ:\n' + tags;
-  var a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob([content], { type: 'text/plain;charset=utf-8' }));
-  a.download = 'neuropreviy_' + state.videoName.replace(/[^a-zA-Zа-яА-Я0-9]/g, '_') + '.' + ext;
+  var content='',ext='txt';
+  if (type==='json'){content=JSON.stringify({title:title,description:desc,tags:tags,platform:currentPlatText,video:state.videoName},null,2);ext='json';}
+  else if (type==='md'){content='# '+title+'\n\n## Описание\n'+desc+'\n\n## Теги\n'+tags;ext='md';}
+  else content='НАЗВАНИЕ:\n'+title+'\n\nОПИСАНИЕ:\n'+desc+'\n\nТЕГИ:\n'+tags;
+  var a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([content],{type:'text/plain;charset=utf-8'}));
+  a.download='neuropreviy_'+state.videoName.replace(/[^a-zA-Zа-яА-Я0-9]/g,'_')+'.'+ext;
   a.click();
-  notify('Файл ' + ext.toUpperCase() + ' сохранён', 'ok');
+  notify('Файл сохранён','ok');
+}
+
+// ═══ МОДАЛКА ПРОКСИ ═══════════════════════════════════════════
+function showProxyModal() {
+  var existing=document.getElementById('proxyModal');
+  if (existing){existing.remove();return;}
+  var m=document.createElement('div');
+  m.id='proxyModal';
+  m.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:300;display:flex;align-items:center;justify-content:center;padding:1rem';
+  m.innerHTML=
+    '<div style="background:var(--s1);border:1px solid var(--b2);border-radius:var(--rl);padding:1.5rem;max-width:480px;width:100%">'+
+    '<div style="font-size:16px;font-weight:600;margin-bottom:.5rem">⚙️ Настройка прокси</div>'+
+    '<div style="font-size:13px;color:var(--t2);margin-bottom:1rem;line-height:1.6">'+
+    'Для обхода CORS нужен Cloudflare Worker.<br>'+
+    'Разверни <strong>cloudflare-worker.js</strong> на <a href="https://workers.cloudflare.com" target="_blank" style="color:var(--ac2)">workers.cloudflare.com</a> (бесплатно)<br>'+
+    'и вставь URL сюда:</div>'+
+    '<input id="proxyInp" class="inp" type="url" placeholder="https://neuropreviy-proxy.ВАШ_ЛОГИН.workers.dev" value="'+PROXY_URL+'" style="margin-bottom:10px">'+
+    '<div style="display:flex;gap:8px;justify-content:flex-end">'+
+    '<button class="btn-g" onclick="document.getElementById(\'proxyModal\').remove()">Отмена</button>'+
+    '<button class="btn" onclick="saveProxyAndClose()">Сохранить и продолжить</button>'+
+    '</div></div>';
+  document.body.appendChild(m);
+  m.addEventListener('click',function(e){if(e.target===m)m.remove();});
+}
+
+function saveProxyAndClose() {
+  var inp=document.getElementById('proxyInp');
+  if (!inp||!inp.value.trim()){notify('Введите URL прокси','err');return;}
+  PROXY_URL=inp.value.trim();
+  localStorage.setItem('np_proxy',PROXY_URL);
+  document.getElementById('proxyModal').remove();
+  notify('Прокси сохранён: '+PROXY_URL,'ok');
+  startGeneration();
 }
 
 // ═══ ИСТОРИЯ ══════════════════════════════════════════════════
 function showHistory() {
-  var el = document.getElementById('histPanel');
-  if (el) { el.remove(); return; }
-  var panel = document.createElement('div');
-  panel.id = 'histPanel';
-  panel.style.cssText = 'position:fixed;top:0;right:0;width:320px;height:100vh;background:var(--s1);border-left:1px solid var(--b);z-index:200;overflow-y:auto;padding:1.2rem;box-shadow:-4px 0 30px rgba(0,0,0,.5)';
-  panel.innerHTML =
-    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem">' +
-    '<div style="font-size:15px;font-weight:600">📁 История проектов</div>' +
-    '<button onclick="document.getElementById(\'histPanel\').remove()" style="background:none;border:none;color:var(--t2);cursor:pointer;font-size:20px">✕</button></div>' +
-    '<div style="font-size:12px;color:var(--t3);margin-bottom:.8rem">' + state.history.length + ' проектов</div>' +
-    (state.history.length ? state.history.map(function(h, i) {
-      return '<div style="padding:10px;background:var(--s2);border:1px solid var(--b);border-radius:10px;margin-bottom:6px">' +
-        '<div style="font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + h.name + '</div>' +
-        '<div style="font-size:11px;color:var(--t3);margin-top:2px">' + h.date + ' · ' + (AI_INFO[h.ai] || {name:h.ai}).name + '</div></div>';
-    }).join('') : '<div style="color:var(--t3);font-size:13px;text-align:center;padding:2rem">История пуста</div>') +
-    (state.history.length ? '<button onclick="clearHistory()" style="width:100%;margin-top:.8rem;padding:8px;background:var(--rdb);border:1px solid rgba(248,113,113,.3);color:var(--rd);border-radius:var(--r);cursor:pointer;font-size:12px">🗑 Очистить историю</button>' : '');
-  document.body.appendChild(panel);
-  setTimeout(function() {
-    var h = function(e) { if (!panel.contains(e.target) && !e.target.closest('.nav-btn')) { panel.remove(); document.removeEventListener('click', h); } };
-    document.addEventListener('click', h);
-  }, 200);
+  var el=document.getElementById('histPanel'); if(el){el.remove();return;}
+  var p=document.createElement('div');
+  p.id='histPanel';
+  p.style.cssText='position:fixed;top:0;right:0;width:300px;height:100vh;background:var(--s1);border-left:1px solid var(--b);z-index:200;overflow-y:auto;padding:1.2rem;box-shadow:-4px 0 24px rgba(0,0,0,.5)';
+  p.innerHTML=
+    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem">'+
+    '<b style="font-size:15px">📁 История</b>'+
+    '<button onclick="this.closest(\'#histPanel\').remove()" style="background:none;border:none;color:var(--t2);cursor:pointer;font-size:20px">✕</button></div>'+
+    (state.history.length?state.history.map(function(h){
+      return '<div style="padding:9px;background:var(--s2);border:1px solid var(--b);border-radius:9px;margin-bottom:6px">'+
+        '<div style="font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+h.name+'</div>'+
+        '<div style="font-size:11px;color:var(--t3);margin-top:2px">'+h.date+'</div></div>';
+    }).join(''):'<div style="color:var(--t3);font-size:13px;text-align:center;padding:2rem">История пуста</div>')+
+    (state.history.length?'<button onclick="clearHist()" style="width:100%;margin-top:.5rem;padding:8px;background:var(--rdb);border:1px solid rgba(248,113,113,.3);color:var(--rd);border-radius:var(--r);cursor:pointer;font-size:12px">🗑 Очистить</button>':'');
+  document.body.appendChild(p);
+  setTimeout(function(){
+    var h=function(e){if(!p.contains(e.target)&&!e.target.closest('.nav-btn')){p.remove();document.removeEventListener('click',h);}};
+    document.addEventListener('click',h);
+  },200);
 }
 
-function clearHistory() {
-  state.history = []; localStorage.removeItem('np_history');
-  document.getElementById('histPanel') && document.getElementById('histPanel').remove();
-  notify('История очищена', 'ok');
-}
+function clearHist(){state.history=[];localStorage.removeItem('np_history');document.getElementById('histPanel')&&document.getElementById('histPanel').remove();notify('История очищена','ok');}
 
-// ═══ ПРОГРЕСС ═════════════════════════════════════════════════
-function setStep(n, status) {
-  var el = document.getElementById('ps' + n); if (!el) return;
-  el.classList.remove('cur', 'done');
-  el.classList.add(status);
-  el.querySelector('.psi').textContent = status === 'done' ? '✓' : status === 'cur' ? '⚡' : '⏳';
+// ═══ ПРОГРЕСС ══════════════════════════════════════════════════
+function setStep(n,st) {
+  var el=document.getElementById('ps'+n); if(!el)return;
+  el.classList.remove('cur','done');
+  if(st==='cur'||st==='done') el.classList.add(st);
+  el.querySelector('.psi').textContent=st==='done'?'✓':st==='cur'?'⚡':'⏳';
 }
-function setPct(p) { document.getElementById('pbarFill').style.width = p + '%'; }
-function addLog(msg) {
-  var el = document.getElementById('logBox');
-  el.textContent += (el.textContent ? '\n' : '') + msg;
-  el.scrollTop = el.scrollHeight;
-}
+function setPct(p){document.getElementById('pbarFill').style.width=p+'%';}
+function addLog(msg){var el=document.getElementById('logBox');el.textContent+=(el.textContent?'\n':'')+msg;el.scrollTop=el.scrollHeight;}
 
-// ═══ УТИЛИТЫ ══════════════════════════════════════════════════
+// ═══ RESET ══════════════════════════════════════════════════
 function resetAll() {
-  state.videoFile = null; state.videoUrl = null; state.videoName = '';
-  state.videoFrameB64 = null; state.videoAnalysis = null;
-  state.thumbUrls = []; state.imagePrompts = [];
-  document.getElementById('vinfoWrap').style.display = 'none';
-  document.getElementById('toS2').style.display = 'none';
-  document.getElementById('urlInp').value = '';
-  document.getElementById('logBox').textContent = 'Ожидание...';
-  document.getElementById('pbarFill').style.width = '0%';
-  document.getElementById('titleOut').textContent = 'Нажмите «Создать»';
-  document.getElementById('titleOut').className = 'tk-out emp';
-  document.getElementById('descOut').textContent = 'Нажмите «Создать»';
-  document.getElementById('descOut').className = 'tk-out emp';
-  document.getElementById('tagsOut').innerHTML = '<span class="tag-emp">Нажмите «Создать»</span>';
-  document.getElementById('thumbsGrid').innerHTML = '';
-  [1,2,3,4,5,6].forEach(function(i) {
-    var el = document.getElementById('ps' + i);
-    if (el) { el.className = 'pstep' + (i===1?' cur':''); el.querySelector('.psi').textContent = '⏳'; }
-  });
+  state.videoFile=null;state.videoUrl=null;state.videoName='';
+  state.videoFrameB64=null;state.videoAnalysis=null;
+  state.thumbUrls=[];state.imagePrompts=[];
+  document.getElementById('vinfoWrap').style.display='none';
+  document.getElementById('toS2').style.display='none';
+  document.getElementById('urlInp').value='';
+  document.getElementById('logBox').textContent='Ожидание...';
+  document.getElementById('pbarFill').style.width='0%';
+  document.getElementById('progTitle').textContent='Анализируем видео...';
+  document.getElementById('thumbsGrid').innerHTML='';
+  resetTextOutputs();
+  [1,2,3,4,5,6].forEach(function(i){setStep(i,i===1?'cur':'wait');});
   goToStep(1);
 }
 
-var _notifTimer;
-function notify(msg, type) {
-  var el = document.getElementById('notif');
-  el.className = 'notif ' + (type || 'ok');
-  el.innerHTML = (type === 'err' ? '❌' : type === 'warn' ? '⚠️' : '✅') + ' ' + msg;
-  el.classList.add('show');
-  clearTimeout(_notifTimer);
-  _notifTimer = setTimeout(function() { el.classList.remove('show'); }, 4000);
-}
+// ═══ PROXY UI в header ═══════════════════════════════════════
+document.addEventListener('DOMContentLoaded', function() {
+  // Добавляем кнопку настройки прокси в шапку
+  var nav=document.querySelector('.hdr-nav');
+  if (nav) {
+    var btn=document.createElement('button');
+    btn.className='nav-btn';
+    btn.textContent='⚙️ Прокси';
+    btn.onclick=showProxyModal;
+    nav.insertBefore(btn,nav.firstChild);
+    // Показываем статус прокси
+    if (PROXY_URL) btn.textContent='⚙️ Прокси ✓';
+  }
+});
 
-document.addEventListener('keydown', function(e) {
-  if (e.key === 'Escape') {
-    var h = document.getElementById('histPanel'); if (h) h.remove();
+// Keyboard
+document.addEventListener('keydown',function(e){
+  if(e.key==='Escape'){
+    ['histPanel','proxyModal'].forEach(function(id){var el=document.getElementById(id);if(el)el.remove();});
   }
 });
 </script>

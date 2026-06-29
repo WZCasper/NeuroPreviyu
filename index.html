@@ -184,6 +184,7 @@ input[type=file]{display:none}
   <div class="hdr-nav">
     <button class="nav-btn" onclick="resetAll()">➕ Новый проект</button>
     <button class="nav-btn" onclick="showHistory()">📁 История</button>
+    <button class="nav-btn" id="proxyBtn" onclick="showProxyModal()" style="border-color:var(--am);color:var(--am)">⚙️ Прокси</button>
   </div>
 </header>
 <main>
@@ -1102,7 +1103,10 @@ function saveProxyAndClose() {
   PROXY_URL=inp.value.trim();
   localStorage.setItem('np_proxy',PROXY_URL);
   document.getElementById('proxyModal').remove();
-  notify('Прокси сохранён: '+PROXY_URL,'ok');
+  // Обновляем кнопку
+  var btn=document.getElementById('proxyBtn');
+  if (btn){btn.textContent='⚙️ Прокси ✓';btn.style.borderColor='var(--gr)';btn.style.color='var(--gr)';}
+  notify('Прокси сохранён ✓','ok');
   startGeneration();
 }
 
@@ -1158,27 +1162,23 @@ function resetAll() {
   goToStep(1);
 }
 
-// ═══ PROXY UI в header ═══════════════════════════════════════
-document.addEventListener('DOMContentLoaded', function() {
-  // Добавляем кнопку настройки прокси в шапку
-  var nav=document.querySelector('.hdr-nav');
-  if (nav) {
-    var btn=document.createElement('button');
-    btn.className='nav-btn';
-    btn.textContent='⚙️ Прокси';
-    btn.onclick=showProxyModal;
-    nav.insertBefore(btn,nav.firstChild);
-    // Показываем статус прокси
-    if (PROXY_URL) btn.textContent='⚙️ Прокси ✓';
-  }
-});
-
 // Keyboard
 document.addEventListener('keydown',function(e){
   if(e.key==='Escape'){
     ['histPanel','proxyModal'].forEach(function(id){var el=document.getElementById(id);if(el)el.remove();});
   }
 });
+
+// Обновляем статус кнопки прокси при загрузке
+(function(){
+  var btn = document.getElementById('proxyBtn');
+  if (!btn) return;
+  if (PROXY_URL) {
+    btn.textContent = '⚙️ Прокси ✓';
+    btn.style.borderColor = 'var(--gr)';
+    btn.style.color = 'var(--gr)';
+  }
+})();
 </script>
 </body>
 </html>

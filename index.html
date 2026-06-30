@@ -450,10 +450,7 @@ input[type=file]{display:none}
 <div class="notif" id="notif"></div>
 <script>
 // ═══ КОНФИГУРАЦИЯ (только владелец меняет здесь) ══════════════
-// Вставь URL своего Cloudflare Worker ниже:
 var PROXY_URL = 'https://neuropreviy-proxy.wzcasper.workers.dev';
-
-// Anthropic API ключ (опционально — если хранишь на сервере, оставь пустым)
 var ANTHROPIC_KEY = '';
 
 // ═══ СОСТОЯНИЕ ════════════════════════════════════════════════
@@ -480,19 +477,19 @@ var AI_INFO = {
 function goToStep(n) {
   if (n >= 2 && !state.videoFile && !state.videoUrl) { notify('Сначала загрузите видео', 'err'); return; }
   for (var i = 1; i <= 4; i++) {
-    document.getElementById('panel'+i).classList.toggle('active', i===n);
-    var st=document.getElementById('step'+i), sn=document.getElementById('sn'+i);
-    st.classList.remove('active','done');
-    if (i===n) st.classList.add('active');
-    if (i<n) { st.classList.add('done'); sn.textContent='✓'; }
-    else if (i>n) sn.textContent=i;
+    document.getElementById('panel' + i).classList.toggle('active', i === n);
+    var st = document.getElementById('step' + i), sn = document.getElementById('sn' + i);
+    st.classList.remove('active', 'done');
+    if (i === n) st.classList.add('active');
+    if (i < n) { st.classList.add('done'); sn.textContent = '✓'; }
+    else if (i > n) sn.textContent = i;
   }
-  window.scrollTo({top:0,behavior:'smooth'});
+  window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 function showTab(id, btn) {
-  document.querySelectorAll('.fsec').forEach(function(s){s.classList.remove('act');});
-  document.querySelectorAll('.ft').forEach(function(b){b.classList.remove('act');});
+  document.querySelectorAll('.fsec').forEach(function(s) { s.classList.remove('act'); });
+  document.querySelectorAll('.ft').forEach(function(b) { b.classList.remove('act'); });
   document.getElementById(id).classList.add('act');
   if (btn) btn.classList.add('act');
 }
@@ -531,16 +528,15 @@ function handleUrl() {
 function showVInfo(name, size, src) {
   document.getElementById('vinfoWrap').style.display = 'block';
   document.getElementById('vinfo').innerHTML =
-    '<div class="vthumb"><video id="vidEl" src="'+src+'" muted playsinline preload="metadata"' +
-    ' style="width:100%;height:100%;object-fit:cover" onloadedmetadata="onVidMeta(this)"></video></div>' +
-    '<div class="vmeta"><div class="vname">'+name+'</div>' +
-    '<div class="chips"><span class="chip">'+name.split('.').pop().toUpperCase()+'</span>' +
-    '<span class="chip">'+size+'</span>' +
+    '<div class="vthumb"><video id="vidEl" src="' + src + '" muted playsinline preload="metadata"' +
+    ' style="width:100%;height:100%;object-fit:cover" onloadedmetadata="onVidMeta(this)" onerror="onVidError(this)"></video></div>' +
+    '<div class="vmeta"><div class="vname">' + name + '</div>' +
+    '<div class="chips"><span class="chip">' + name.split('.').pop().toUpperCase() + '</span>' +
+    '<span class="chip">' + size + '</span>' +
     '<span class="chip" id="durChip">загрузка...</span></div></div>' +
     '<button class="rm" onclick="removeVideo()">✕</button>';
   document.getElementById('toS2').style.display = 'inline-block';
   updateAnalyzeInfo();
-  // Даём время видео загрузиться перед захватом кадра
   setTimeout(captureFrame, 1500);
 }
 
@@ -548,14 +544,19 @@ function onVidMeta(v) {
   state.videoDuration = v.duration || 0;
   var d = v.duration || 0;
   var chip = document.getElementById('durChip');
-  if (chip) chip.textContent = Math.floor(d/60)+':'+(('0'+Math.floor(d%60)).slice(-2));
+  if (chip) chip.textContent = Math.floor(d / 60) + ':' + (('0' + Math.floor(d % 60)).slice(-2));
+}
+
+function onVidError(v) {
+  var chip = document.getElementById('durChip');
+  if (chip) chip.textContent = 'видео загружено';
+  addLog('ℹ Предпросмотр видео недоступен (это нормально для некоторых ссылок), но загрузка продолжится');
 }
 
 function captureFrame() {
   var v = document.getElementById('vidEl');
   if (!v) { addLog('ℹ Видео элемент не найден'); return; }
   if (!v.readyState || v.readyState < 2) {
-    // Ждём ещё
     setTimeout(captureFrame, 1000);
     return;
   }
@@ -570,181 +571,176 @@ function captureFrame() {
         cv.getContext('2d').drawImage(v, 0, 0, 320, 180);
         state.videoFrameB64 = cv.toDataURL('image/jpeg', 0.8).split(',')[1];
         addLog('✓ Кадр захвачен для анализа');
-      } catch(drawErr) {
+      } catch (drawErr) {
         addLog('ℹ Кадр: ' + drawErr.message + ' (анализ по имени файла)');
       }
-    }, {once: true});
-  } catch(e) {
+    }, { once: true });
+  } catch (e) {
     addLog('ℹ Кадр недоступен: ' + e.message);
   }
 }
 
 function removeVideo() {
-  state.videoFile=null; state.videoUrl=null; state.videoName='';
-  state.videoFrameB64=null; state.videoAnalysis=null;
-  document.getElementById('vinfoWrap').style.display='none';
-  document.getElementById('toS2').style.display='none';
+  state.videoFile = null; state.videoUrl = null; state.videoName = '';
+  state.videoFrameB64 = null; state.videoAnalysis = null;
+  document.getElementById('vinfoWrap').style.display = 'none';
+  document.getElementById('toS2').style.display = 'none';
 }
 
 function fmtSize(b) {
-  if (b>1e9) return (b/1e9).toFixed(2)+' ГБ';
-  if (b>1e6) return (b/1e6).toFixed(1)+' МБ';
-  return (b/1e3).toFixed(0)+' КБ';
+  if (b > 1e9) return (b / 1e9).toFixed(2) + ' ГБ';
+  if (b > 1e6) return (b / 1e6).toFixed(1) + ' МБ';
+  return (b / 1e3).toFixed(0) + ' КБ';
 }
 
 // ═══ НАСТРОЙКИ ════════════════════════════════════════════════
 function selRatio(r) {
-  state.ratio=r;
-  document.getElementById('r169').classList.toggle('sel',r==='16:9');
-  document.getElementById('r916').classList.toggle('sel',r==='9:16');
+  state.ratio = r;
+  document.getElementById('r169').classList.toggle('sel', r === '16:9');
+  document.getElementById('r916').classList.toggle('sel', r === '9:16');
   updateAnalyzeInfo();
 }
 
-function selAI(el,id) {
-  state.aiPlatform=id;
-  document.querySelectorAll('.ai-item').forEach(function(i){i.classList.remove('sel');});
+function selAI(el, id) {
+  state.aiPlatform = id;
+  document.querySelectorAll('.ai-item').forEach(function(i) { i.classList.remove('sel'); });
   el.classList.add('sel');
   var needKey = !AI_INFO[id].free;
-  document.getElementById('keyBlock').style.display = needKey?'block':'none';
+  document.getElementById('keyBlock').style.display = needKey ? 'block' : 'none';
   if (needKey) {
-    document.getElementById('keyLbl').textContent = 'API ключ для '+AI_INFO[id].name;
-    var saved=localStorage.getItem('key_'+id);
-    if (saved) document.getElementById('apiKey').value=saved;
+    document.getElementById('keyLbl').textContent = 'API ключ для ' + AI_INFO[id].name;
+    var saved = localStorage.getItem('key_' + id);
+    if (saved) document.getElementById('apiKey').value = saved;
   }
   updateAnalyzeInfo();
 }
 
-function selStyle(el,s) {
-  state.imgStyle=s;
-  document.querySelectorAll('.style-btn').forEach(function(b){b.classList.remove('sel');});
+function selStyle(el, s) {
+  state.imgStyle = s;
+  document.querySelectorAll('.style-btn').forEach(function(b) { b.classList.remove('sel'); });
   el.classList.add('sel');
   updateAnalyzeInfo();
 }
 
 function updateAnalyzeInfo() {
-  var ai=AI_INFO[state.aiPlatform]||{name:state.aiPlatform};
-  document.getElementById('analyzeInfoTxt').innerHTML=
-    'Платформа: <strong>'+ai.name+'</strong> · Формат: <strong>'+state.ratio+
-    '</strong> · Стиль: <strong>'+state.imgStyle+'</strong>';
+  var ai = AI_INFO[state.aiPlatform] || { name: state.aiPlatform };
+  document.getElementById('analyzeInfoTxt').innerHTML =
+    'Платформа: <strong>' + ai.name + '</strong> · Формат: <strong>' + state.ratio +
+    '</strong> · Стиль: <strong>' + state.imgStyle + '</strong>';
 }
 
 function toggleKey() {
-  var i=document.getElementById('apiKey');
-  i.type=i.type==='password'?'text':'password';
+  var i = document.getElementById('apiKey');
+  i.type = i.type === 'password' ? 'text' : 'password';
 }
 function saveKey() {
-  var k=document.getElementById('apiKey').value.trim();
-  if(k){localStorage.setItem('key_'+state.aiPlatform,k);notify('Ключ сохранён','ok');}
+  var k = document.getElementById('apiKey').value.trim();
+  if (k) { localStorage.setItem('key_' + state.aiPlatform, k); notify('Ключ сохранён', 'ok'); }
 }
 
 // ═══ ПРОКСИ — только через зашитый URL ════════════════════════
 async function proxyPost(path, body, extraHeaders) {
   if (!PROXY_URL) throw new Error('Прокси не настроен. Обратитесь к владельцу сайта.');
-  var headers = Object.assign({'Content-Type':'application/json'}, extraHeaders||{});
-  var resp = await fetch(PROXY_URL.replace(/\/$/, '')+path, {
-    method:'POST',
-    headers:headers,
-    body:JSON.stringify(body)
+  var headers = Object.assign({ 'Content-Type': 'application/json' }, extraHeaders || {});
+  var resp = await fetch(PROXY_URL.replace(/\/$/, '') + path, {
+    method: 'POST',
+    headers: headers,
+    body: JSON.stringify(body)
   });
   var data;
-  try { data = await resp.json(); } catch(e) { throw new Error('Ответ прокси не JSON: '+resp.status); }
-  if (!resp.ok) throw new Error('Прокси '+resp.status+': '+(data.error||JSON.stringify(data).substring(0,200)));
+  try { data = await resp.json(); } catch (e) { throw new Error('Ответ прокси не JSON: ' + resp.status); }
+  if (!resp.ok) throw new Error('Прокси ' + resp.status + ': ' + (data.error || JSON.stringify(data).substring(0, 200)));
   return data;
 }
 
 // ═══ ЗАПУСК ГЕНЕРАЦИИ ═════════════════════════════════════════
 function startGeneration() {
   if (!state.videoFile && !state.videoUrl) { notify('Загрузите видео', 'err'); return; }
-  state.apiKey = (document.getElementById('apiKey').value||'').trim();
+  state.apiKey = (document.getElementById('apiKey').value || '').trim();
   state.lang = document.getElementById('langSel').value;
   state.platform = document.getElementById('platSel').value;
   state.tone = document.getElementById('toneSel').value;
   var needKey = !AI_INFO[state.aiPlatform].free;
   if (needKey && !state.apiKey) {
-    notify('Введите API ключ для '+AI_INFO[state.aiPlatform].name,'err');
+    notify('Введите API ключ для ' + AI_INFO[state.aiPlatform].name, 'err');
     return;
   }
-  state.thumbUrls=[]; state.imagePrompts=[];
-  document.getElementById('thumbsGrid').innerHTML='';
+  state.thumbUrls = []; state.imagePrompts = [];
+  document.getElementById('thumbsGrid').innerHTML = '';
   resetTextOutputs();
   goToStep(3);
   runGeneration();
 }
 
 function resetTextOutputs() {
-  ['titleOut','descOut'].forEach(function(id){
-    var el=document.getElementById(id);
-    if(el){el.textContent='Нажмите «Создать»';el.className='tk-out emp';}
+  ['titleOut', 'descOut'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) { el.textContent = 'Нажмите «Создать»'; el.className = 'tk-out emp'; }
   });
-  document.getElementById('tagsOut').innerHTML='<span class="tag-emp">Нажмите «Создать»</span>';
+  document.getElementById('tagsOut').innerHTML = '<span class="tag-emp">Нажмите «Создать»</span>';
 }
 
-function sleep(ms){ return new Promise(function(r){setTimeout(r,ms);}); }
+function sleep(ms) { return new Promise(function(r) { setTimeout(r, ms); }); }
 
 async function runGeneration() {
-  document.getElementById('logBox').textContent='';
-  document.getElementById('pbarFill').style.width='0%';
-  document.getElementById('progTitle').textContent='Анализируем видео...';
-  for(var i=1;i<=6;i++) setStep(i, i===1?'cur':'wait');
+  document.getElementById('logBox').textContent = '';
+  document.getElementById('pbarFill').style.width = '0%';
+  document.getElementById('progTitle').textContent = 'Анализируем видео...';
+  for (var i = 1; i <= 6; i++) setStep(i, i === 1 ? 'cur' : 'wait');
 
   try {
-    // ШАГ 1: Анализ видео
-    addLog('Видео: '+state.videoName);
-    setStep(1,'cur'); setPct(8);
+    addLog('Видео: ' + state.videoName);
+    setStep(1, 'cur'); setPct(8);
     var analysis = await analyzeVideo();
     state.videoAnalysis = analysis;
-    setStep(1,'done'); setPct(25);
+    setStep(1, 'done'); setPct(25);
     addLog('✓ Анализ завершён');
-    addLog('Содержимое: '+analysis.substring(0,150)+'...');
+    addLog('Содержимое: ' + analysis.substring(0, 150) + '...');
 
-    // ШАГ 2-3: Промпты
-    setStep(2,'cur'); setStep(3,'cur');
+    setStep(2, 'cur'); setStep(3, 'cur');
     addLog('Создаём промпты для изображений...');
-    var count = parseInt(document.getElementById('countSel').value)||2;
+    var count = parseInt(document.getElementById('countSel').value) || 2;
     var prompts = await makeImagePrompts(analysis, count);
     state.imagePrompts = prompts;
-    setStep(2,'done'); setStep(3,'done'); setPct(40);
-    addLog('✓ Промпты: '+prompts.length+' шт.');
+    setStep(2, 'done'); setStep(3, 'done'); setPct(40);
+    addLog('✓ Промпты: ' + prompts.length + ' шт.');
 
-    // ШАГ 4-5: Генерация картинок
-    for (var j=0; j<prompts.length; j++) {
-      var stepId = j===0?4:5;
-      setStep(stepId,'cur');
-      document.getElementById('progTitle').textContent='Генерация превью '+(j+1)+'/'+prompts.length+'...';
-      addLog('Генерация '+(j+1)+': '+prompts[j].substring(0,80)+'...');
+    for (var j = 0; j < prompts.length; j++) {
+      var stepId = j === 0 ? 4 : 5;
+      setStep(stepId, 'cur');
+      document.getElementById('progTitle').textContent = 'Генерация превью ' + (j + 1) + '/' + prompts.length + '...';
+      addLog('Генерация ' + (j + 1) + ': ' + prompts[j].substring(0, 80) + '...');
       try {
         var imgUrl = await generateImage(prompts[j]);
-        state.thumbUrls.push({url:imgUrl, prompt:prompts[j], label:'Вариант '+(j+1)});
-        setStep(stepId,'done');
-        addLog('✓ Превью '+(j+1)+' готово');
-      } catch(imgErr) {
-        addLog('⚠ Превью '+(j+1)+': '+imgErr.message);
-        state.thumbUrls.push({url:null, prompt:prompts[j], label:'Вариант '+(j+1), error:imgErr.message});
-        setStep(stepId,'done');
+        state.thumbUrls.push({ url: imgUrl, prompt: prompts[j], label: 'Вариант ' + (j + 1) });
+        setStep(stepId, 'done');
+        addLog('✓ Превью ' + (j + 1) + ' готово');
+      } catch (imgErr) {
+        addLog('⚠ Превью ' + (j + 1) + ': ' + imgErr.message);
+        state.thumbUrls.push({ url: null, prompt: prompts[j], label: 'Вариант ' + (j + 1), error: imgErr.message });
+        setStep(stepId, 'done');
       }
-      setPct(40 + (j+1)*25);
+      setPct(40 + (j + 1) * 25);
     }
 
-    // Готово
-    setStep(6,'done'); setPct(100);
-    document.getElementById('progTitle').textContent='Готово!';
+    setStep(6, 'done'); setPct(100);
+    document.getElementById('progTitle').textContent = 'Готово!';
     addLog('✓ Всё готово!');
     await sleep(600);
     renderResults();
     goToStep(4);
 
-  } catch(e) {
-    addLog('❌ Ошибка: '+e.message);
-    document.getElementById('progTitle').textContent='Ошибка генерации';
-    notify('Ошибка: '+e.message,'err');
+  } catch (e) {
+    addLog('❌ Ошибка: ' + e.message);
+    document.getElementById('progTitle').textContent = 'Ошибка генерации';
+    notify('Ошибка: ' + e.message, 'err');
   }
 }
 
 // ═══ АНАЛИЗ ВИДЕО ЧЕРЕЗ CLAUDE ════════════════════════════════
 async function analyzeVideo() {
-  var name = state.videoName.replace(/\.[^.]+$/,'').replace(/[-_]/g,' ');
+  var name = state.videoName.replace(/\.[^.]+$/, '').replace(/[-_]/g, ' ');
 
-  // Формируем сообщение — с кадром или без
   var messages;
   if (state.videoFrameB64) {
     messages = [{
@@ -757,7 +753,7 @@ async function analyzeVideo() {
         {
           type: 'text',
           text: 'Это кадр из видео "' + name + '"' +
-            (state.videoDuration ? ' (длительность: '+Math.round(state.videoDuration)+' сек)' : '') + '.\n' +
+            (state.videoDuration ? ' (длительность: ' + Math.round(state.videoDuration) + ' сек)' : '') + '.\n' +
             'Проанализируй видео и определи:\n' +
             '1. О чём это видео — тема и содержание\n' +
             '2. Что видно в кадре (люди, объекты, место)\n' +
@@ -769,11 +765,10 @@ async function analyzeVideo() {
       ]
     }];
   } else {
-    // Без кадра — анализ только по имени файла
     messages = [{
       role: 'user',
       content: 'Видео называется "' + name + '"' +
-        (state.videoDuration ? ' (длительность: '+Math.round(state.videoDuration)+' сек)' : '') + '.\n' +
+        (state.videoDuration ? ' (длительность: ' + Math.round(state.videoDuration) + ' сек)' : '') + '.\n' +
         'По названию определи:\n' +
         '1. Вероятная тема и содержание видео\n' +
         '2. Жанр\n' +
@@ -789,465 +784,465 @@ async function analyzeVideo() {
     messages: messages
   });
 
-  if (data.error) throw new Error('Claude: ' + (data.error.message||data.error));
+  if (data.error) throw new Error('Claude: ' + (data.error.message || data.error));
   if (!data.content || !data.content[0]) throw new Error('Claude: пустой ответ');
   return data.content[0].text;
 }
 
 // ═══ ПРОМПТЫ ДЛЯ ИЗОБРАЖЕНИЙ ══════════════════════════════════
 async function makeImagePrompts(analysis, count) {
-  var name = state.videoName.replace(/\.[^.]+$/,'').replace(/[-_]/g,' ');
+  var name = state.videoName.replace(/\.[^.]+$/, '').replace(/[-_]/g, ' ');
   var data = await proxyPost('/claude', {
     model: 'claude-sonnet-4-6',
     max_tokens: 600,
     messages: [{
       role: 'user',
       content:
-        'Создай '+count+' промпта на английском для генерации YouTube thumbnail.\n\n'+
-        'Видео: "'+name+'"\n'+
-        'Анализ:\n'+analysis+'\n\n'+
-        'Стиль изображения: '+state.imgStyle+'\n'+
-        'Формат: '+state.ratio+'\n\n'+
-        'Каждый промпт должен:\n'+
-        '- Быть на английском языке\n'+
-        '- Описывать яркую привлекательную обложку по теме видео\n'+
-        '- Включать: '+state.imgStyle+', high quality, sharp, vibrant, eye-catching thumbnail\n'+
-        '- Варианты должны отличаться композицией\n\n'+
+        'Создай ' + count + ' промпта на английском для генерации YouTube thumbnail.\n\n' +
+        'Видео: "' + name + '"\n' +
+        'Анализ:\n' + analysis + '\n\n' +
+        'Стиль изображения: ' + state.imgStyle + '\n' +
+        'Формат: ' + state.ratio + '\n\n' +
+        'Каждый промпт должен:\n' +
+        '- Быть на английском языке\n' +
+        '- Описывать яркую привлекательную обложку по теме видео\n' +
+        '- Включать: ' + state.imgStyle + ', high quality, sharp, vibrant, eye-catching thumbnail\n' +
+        '- Варианты должны отличаться композицией\n\n' +
         'Верни ТОЛЬКО промпты, по одному на строку, без нумерации и пояснений.'
     }]
   });
 
-  if (data.error) throw new Error('Промпты Claude: '+(data.error.message||data.error));
+  if (data.error) throw new Error('Промпты Claude: ' + (data.error.message || data.error));
   if (!data.content || !data.content[0]) throw new Error('Claude промпты: пустой ответ');
   var text = data.content[0].text;
-  var lines = text.split('\n').map(function(l){return l.trim();}).filter(function(l){return l.length>15;});
-  if (!lines.length) lines = [name+', '+state.imgStyle+', high quality thumbnail, eye-catching'];
+  var lines = text.split('\n').map(function(l) { return l.trim(); }).filter(function(l) { return l.length > 15; });
+  if (!lines.length) lines = [name + ', ' + state.imgStyle + ', high quality thumbnail, eye-catching'];
   return lines.slice(0, count);
 }
 
 // ═══ ГЕНЕРАЦИЯ ИЗОБРАЖЕНИЙ ════════════════════════════════════
 async function generateImage(prompt) {
   var fp = prompt + ', professional thumbnail, high quality, sharp';
-  switch(state.aiPlatform) {
+  switch (state.aiPlatform) {
     case 'hf':     return await imgHF(fp);
     case 'nano':   return await imgPollinations(fp);
     case 'gemini': return await imgGemini(fp);
     case 'dalle':  return await imgDallE(fp);
     case 'stab':   return await imgStability(fp);
-    default: throw new Error('Неизвестная платформа: '+state.aiPlatform);
+    default: throw new Error('Неизвестная платформа: ' + state.aiPlatform);
   }
 }
 
 async function imgHF(prompt) {
-  var isP = state.ratio==='9:16';
+  var isP = state.ratio === '9:16';
   var data = await proxyPost('/huggingface', {
     model: 'black-forest-labs/FLUX.1-schnell',
     prompt: prompt,
-    parameters: { width: isP?576:1024, height: isP?1024:576, num_inference_steps: 4 }
-  }, state.apiKey ? {'x-hf-key':state.apiKey} : {});
-  if (data.error) throw new Error('HuggingFace: '+data.error);
+    parameters: { width: isP ? 576 : 1024, height: isP ? 1024 : 576, num_inference_steps: 4 }
+  }, state.apiKey ? { 'x-hf-key': state.apiKey } : {});
+  if (data.error) throw new Error('HuggingFace: ' + data.error);
   if (!data.image) throw new Error('HuggingFace: нет изображения в ответе');
-  return 'data:image/png;base64,'+data.image;
+  return 'data:image/png;base64,' + data.image;
 }
 
 async function imgPollinations(prompt) {
-  var isP = state.ratio==='9:16';
+  var isP = state.ratio === '9:16';
   var data = await proxyPost('/pollinations', {
     prompt: prompt,
-    width: isP?576:1280,
-    height: isP?1024:720
+    width: isP ? 576 : 1280,
+    height: isP ? 1024 : 720
   });
-  if (data.error) throw new Error('Pollinations: '+data.error);
+  if (data.error) throw new Error('Pollinations: ' + data.error);
   if (!data.image) throw new Error('Pollinations: нет изображения в ответе');
-  return 'data:image/jpeg;base64,'+data.image;
+  return 'data:image/jpeg;base64,' + data.image;
 }
 
 async function imgGemini(prompt) {
   if (!state.apiKey) throw new Error('Нужен Google API ключ');
   var data = await proxyPost('/gemini', {
-    instances: [{prompt: prompt}],
-    parameters: { sampleCount: 1, aspectRatio: state.ratio==='9:16'?'9:16':'16:9' }
-  }, {'x-gemini-key': state.apiKey});
-  if (data.error) throw new Error('Gemini: '+(data.error.message||JSON.stringify(data.error)));
-  var b64 = data.predictions&&data.predictions[0]&&data.predictions[0].bytesBase64Encoded;
+    instances: [{ prompt: prompt }],
+    parameters: { sampleCount: 1, aspectRatio: state.ratio === '9:16' ? '9:16' : '16:9' }
+  }, { 'x-gemini-key': state.apiKey });
+  if (data.error) throw new Error('Gemini: ' + (data.error.message || JSON.stringify(data.error)));
+  var b64 = data.predictions && data.predictions[0] && data.predictions[0].bytesBase64Encoded;
   if (!b64) throw new Error('Gemini: нет изображения в ответе');
-  return 'data:image/png;base64,'+b64;
+  return 'data:image/png;base64,' + b64;
 }
 
 async function imgDallE(prompt) {
   if (!state.apiKey) throw new Error('Нужен OpenAI API ключ');
-  var size = state.ratio==='9:16'?'1024x1792':'1792x1024';
+  var size = state.ratio === '9:16' ? '1024x1792' : '1792x1024';
   var data = await proxyPost('/openai',
-    {model:'dall-e-3', prompt:prompt, n:1, size:size, quality:'standard'},
-    {'x-openai-key': state.apiKey}
+    { model: 'dall-e-3', prompt: prompt, n: 1, size: size, quality: 'standard' },
+    { 'x-openai-key': state.apiKey }
   );
-  if (data.error) throw new Error('DALL·E: '+(data.error.message||JSON.stringify(data.error)));
-  if (!data.data||!data.data[0]||!data.data[0].url) throw new Error('DALL·E: нет URL изображения');
+  if (data.error) throw new Error('DALL·E: ' + (data.error.message || JSON.stringify(data.error)));
+  if (!data.data || !data.data[0] || !data.data[0].url) throw new Error('DALL·E: нет URL изображения');
   return data.data[0].url;
 }
 
 async function imgStability(prompt) {
   if (!state.apiKey) throw new Error('Нужен Stability AI ключ');
-  var isP = state.ratio==='9:16';
+  var isP = state.ratio === '9:16';
   var data = await proxyPost('/stability', {
-    text_prompts: [{text:prompt, weight:1}],
-    width: isP?576:1024, height: isP?1024:576,
+    text_prompts: [{ text: prompt, weight: 1 }],
+    width: isP ? 576 : 1024, height: isP ? 1024 : 576,
     steps: 30, samples: 1
-  }, {'x-stability-key': state.apiKey});
-  if (data.message) throw new Error('Stability: '+data.message);
-  var b64 = data.artifacts&&data.artifacts[0]&&data.artifacts[0].base64;
+  }, { 'x-stability-key': state.apiKey });
+  if (data.message) throw new Error('Stability: ' + data.message);
+  var b64 = data.artifacts && data.artifacts[0] && data.artifacts[0].base64;
   if (!b64) throw new Error('Stability: нет изображения в ответе');
-  return 'data:image/png;base64,'+b64;
+  return 'data:image/png;base64,' + b64;
 }
 
 // ═══ РЕНДЕР РЕЗУЛЬТАТОВ ═══════════════════════════════════════
 function renderResults() {
   var grid = document.getElementById('thumbsGrid');
-  grid.innerHTML='';
-  var isP = state.ratio==='9:16';
-  state.thumbUrls.forEach(function(th,i) {
-    var card=document.createElement('div');
-    card.className='th-card';
+  grid.innerHTML = '';
+  var isP = state.ratio === '9:16';
+  state.thumbUrls.forEach(function(th, i) {
+    var card = document.createElement('div');
+    card.className = 'th-card';
     if (th.url) {
-      card.innerHTML=
-        '<div class="th-img-wrap" style="aspect-ratio:'+(isP?'9/16':'16/9')+'">'+
-        '<img src="'+th.url+'" alt="'+th.label+'" loading="lazy" style="width:100%;height:100%;object-fit:cover">'+
-        '<div class="th-overlay">'+
-        '<button class="th-btn" onclick="dlOne('+i+','png')">⬇ PNG</button>'+
-        '<button class="th-btn" onclick="dlOne('+i+','jpg')">⬇ JPG</button>'+
-        '</div></div>'+
-        '<div class="th-footer"><div class="th-name">'+th.label+'</div>'+
-        '<div class="th-meta">'+
-        '<span class="th-badge">'+state.ratio+'</span>'+
-        '<span class="th-badge">'+AI_INFO[state.aiPlatform].name+'</span>'+
+      card.innerHTML =
+        '<div class="th-img-wrap" style="aspect-ratio:' + (isP ? '9/16' : '16/9') + '">' +
+        '<img src="' + th.url + '" alt="' + th.label + '" loading="lazy" style="width:100%;height:100%;object-fit:cover">' +
+        '<div class="th-overlay">' +
+        '<button class="th-btn" onclick="dlOne(' + i + ',\'png\')">⬇ PNG</button>' +
+        '<button class="th-btn" onclick="dlOne(' + i + ',\'jpg\')">⬇ JPG</button>' +
+        '</div></div>' +
+        '<div class="th-footer"><div class="th-name">' + th.label + '</div>' +
+        '<div class="th-meta">' +
+        '<span class="th-badge">' + state.ratio + '</span>' +
+        '<span class="th-badge">' + AI_INFO[state.aiPlatform].name + '</span>' +
         '</div></div>';
     } else {
-      card.innerHTML=
-        '<div class="th-img-wrap" style="aspect-ratio:'+(isP?'9/16':'16/9')+'">'+
-        '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;min-height:180px;gap:10px;padding:1rem;color:var(--t3)">'+
-        '<div style="font-size:32px">❌</div>'+
-        '<div style="font-size:12px;text-align:center;max-width:200px">'+(th.error||'Ошибка генерации')+'</div>'+
-        '<button class="btn" style="font-size:12px;padding:6px 14px;margin-top:4px" onclick="regenOne('+i+')">🔁 Повторить</button>'+
-        '</div></div>'+
-        '<div class="th-footer"><div class="th-name">'+th.label+' — ошибка</div></div>';
+      card.innerHTML =
+        '<div class="th-img-wrap" style="aspect-ratio:' + (isP ? '9/16' : '16/9') + '">' +
+        '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;min-height:180px;gap:10px;padding:1rem;color:var(--t3)">' +
+        '<div style="font-size:32px">❌</div>' +
+        '<div style="font-size:12px;text-align:center;max-width:200px">' + (th.error || 'Ошибка генерации') + '</div>' +
+        '<button class="btn" style="font-size:12px;padding:6px 14px;margin-top:4px" onclick="regenOne(' + i + ')">🔁 Повторить</button>' +
+        '</div></div>' +
+        '<div class="th-footer"><div class="th-name">' + th.label + ' — ошибка</div></div>';
     }
     grid.appendChild(card);
   });
   document.getElementById('resSub').textContent =
-    state.videoName+' · '+AI_INFO[state.aiPlatform].name+' · '+state.ratio;
-  var entry={name:state.videoName, date:new Date().toLocaleString('ru'), ai:state.aiPlatform};
+    state.videoName + ' · ' + AI_INFO[state.aiPlatform].name + ' · ' + state.ratio;
+  var entry = { name: state.videoName, date: new Date().toLocaleString('ru'), ai: state.aiPlatform };
   state.history.unshift(entry);
-  if (state.history.length>20) state.history.pop();
-  localStorage.setItem('np_history',JSON.stringify(state.history));
+  if (state.history.length > 20) state.history.pop();
+  localStorage.setItem('np_history', JSON.stringify(state.history));
 }
 
 // ═══ СКАЧИВАНИЕ ═══════════════════════════════════════════════
 function dlOne(idx, fmt) {
-  var th=state.thumbUrls[idx];
-  if (!th||!th.url) { notify('Нет изображения','err'); return; }
+  var th = state.thumbUrls[idx];
+  if (!th || !th.url) { notify('Нет изображения', 'err'); return; }
   if (th.url.startsWith('data:')) {
-    var cv=document.createElement('canvas');
-    var img=new Image();
-    img.onload=function(){
-      cv.width=img.width; cv.height=img.height;
-      cv.getContext('2d').drawImage(img,0,0);
-      var a=document.createElement('a');
-      a.href=cv.toDataURL(fmt==='jpg'?'image/jpeg':'image/png', 0.93);
-      a.download='thumbnail_'+(idx+1)+'_'+state.ratio.replace(':','x')+'.'+fmt;
+    var cv = document.createElement('canvas');
+    var img = new Image();
+    img.onload = function() {
+      cv.width = img.width; cv.height = img.height;
+      cv.getContext('2d').drawImage(img, 0, 0);
+      var a = document.createElement('a');
+      a.href = cv.toDataURL(fmt === 'jpg' ? 'image/jpeg' : 'image/png', 0.93);
+      a.download = 'thumbnail_' + (idx + 1) + '_' + state.ratio.replace(':', 'x') + '.' + fmt;
       a.click();
-      notify('Скачано!','ok');
+      notify('Скачано!', 'ok');
     };
-    img.src=th.url;
+    img.src = th.url;
   } else {
-    // URL изображения (DALL-E) — открываем в новой вкладке
-    window.open(th.url,'_blank');
-    notify('Открыто в новой вкладке','ok');
+    window.open(th.url, '_blank');
+    notify('Открыто в новой вкладке', 'ok');
   }
 }
 
 function downloadAll(fmt) {
-  var hasThumbs = state.thumbUrls.filter(function(t){return t.url;});
-  if (!hasThumbs.length) { notify('Нет готовых превью','err'); return; }
-  hasThumbs.forEach(function(t,i){
-    setTimeout(function(){ dlOne(state.thumbUrls.indexOf(t), fmt); }, i*600);
+  var hasThumbs = state.thumbUrls.filter(function(t) { return t.url; });
+  if (!hasThumbs.length) { notify('Нет готовых превью', 'err'); return; }
+  hasThumbs.forEach(function(t, i) {
+    setTimeout(function() { dlOne(state.thumbUrls.indexOf(t), fmt); }, i * 600);
   });
 }
 
 async function regenOne(idx) {
-  if (!state.imagePrompts[idx]) { notify('Промпт не найден','err'); return; }
-  var cards=document.getElementById('thumbsGrid').children;
+  if (!state.imagePrompts[idx]) { notify('Промпт не найден', 'err'); return; }
+  var cards = document.getElementById('thumbsGrid').children;
   if (cards[idx]) {
-    var wrap=cards[idx].querySelector('.th-img-wrap');
-    if (wrap) wrap.innerHTML=
-      '<div style="display:flex;align-items:center;justify-content:center;height:100%;min-height:180px;gap:8px;color:var(--t2)">'+
+    var wrap = cards[idx].querySelector('.th-img-wrap');
+    if (wrap) wrap.innerHTML =
+      '<div style="display:flex;align-items:center;justify-content:center;height:100%;min-height:180px;gap:8px;color:var(--t2)">' +
       '<div class="spinner"></div> Генерирую...</div>';
   }
   try {
-    var url=await generateImage(state.imagePrompts[idx]);
-    state.thumbUrls[idx]={url:url, prompt:state.imagePrompts[idx], label:'Вариант '+(idx+1)};
+    var url = await generateImage(state.imagePrompts[idx]);
+    state.thumbUrls[idx] = { url: url, prompt: state.imagePrompts[idx], label: 'Вариант ' + (idx + 1) };
     renderResults();
-    notify('Превью '+(idx+1)+' готово','ok');
-  } catch(e) {
-    state.thumbUrls[idx].error=e.message;
+    notify('Превью ' + (idx + 1) + ' готово', 'ok');
+  } catch (e) {
+    state.thumbUrls[idx].error = e.message;
     renderResults();
-    notify('Ошибка: '+e.message,'err');
+    notify('Ошибка: ' + e.message, 'err');
   }
 }
 
 async function regenThumbs() {
-  if (!state.imagePrompts.length) { notify('Сначала запустите генерацию','err'); return; }
-  notify('Перегенерация...','ok');
-  state.thumbUrls=[];
+  if (!state.imagePrompts.length) { notify('Сначала запустите генерацию', 'err'); return; }
+  notify('Перегенерация...', 'ok');
+  state.thumbUrls = [];
   renderResults();
-  for (var i=0; i<state.imagePrompts.length; i++) {
+  for (var i = 0; i < state.imagePrompts.length; i++) {
     try {
-      var url=await generateImage(state.imagePrompts[i]);
-      state.thumbUrls.push({url:url, prompt:state.imagePrompts[i], label:'Вариант '+(i+1)});
-    } catch(e) {
-      state.thumbUrls.push({url:null, prompt:state.imagePrompts[i], label:'Вариант '+(i+1), error:e.message});
+      var url = await generateImage(state.imagePrompts[i]);
+      state.thumbUrls.push({ url: url, prompt: state.imagePrompts[i], label: 'Вариант ' + (i + 1) });
+    } catch (e) {
+      state.thumbUrls.push({ url: null, prompt: state.imagePrompts[i], label: 'Вариант ' + (i + 1), error: e.message });
     }
     renderResults();
   }
 }
 
 function copyPrompts() {
-  if (!state.imagePrompts.length) { notify('Промпты не готовы','err'); return; }
+  if (!state.imagePrompts.length) { notify('Промпты не готовы', 'err'); return; }
   navigator.clipboard.writeText(state.imagePrompts.join('\n\n'))
-    .then(function(){ notify('Промпты скопированы','ok'); });
+    .then(function() { notify('Промпты скопированы', 'ok'); });
 }
 
 // ═══ ТЕКСТЫ ЧЕРЕЗ CLAUDE ══════════════════════════════════════
 var currentPlatText = 'YouTube';
 
 function selPlatText(btn, plat) {
-  currentPlatText=plat;
-  document.querySelectorAll('.plat-btn').forEach(function(b){b.classList.remove('sel');});
+  currentPlatText = plat;
+  document.querySelectorAll('.plat-btn').forEach(function(b) { b.classList.remove('sel'); });
   btn.classList.add('sel');
 }
 
 function getCtx() {
-  var name = state.videoName.replace(/\.[^.]+$/,'').replace(/[-_]/g,' ');
-  return 'Видео: "'+name+'"\n'+
-    (state.videoAnalysis ? 'Анализ содержимого:\n'+state.videoAnalysis+'\n' : '')+
-    'Платформа: '+currentPlatText+'\n'+
-    'Язык ответа: '+state.lang+'\n'+
-    'Тон: '+state.tone+'\n';
+  var name = state.videoName.replace(/\.[^.]+$/, '').replace(/[-_]/g, ' ');
+  return 'Видео: "' + name + '"\n' +
+    (state.videoAnalysis ? 'Анализ содержимого:\n' + state.videoAnalysis + '\n' : '') +
+    'Платформа: ' + currentPlatText + '\n' +
+    'Язык ответа: ' + state.lang + '\n' +
+    'Тон: ' + state.tone + '\n';
 }
 
 async function claudeText(prompt) {
   var data = await proxyPost('/claude', {
     model: 'claude-sonnet-4-6',
     max_tokens: 1000,
-    messages: [{role:'user', content:prompt}]
+    messages: [{ role: 'user', content: prompt }]
   });
-  if (data.error) throw new Error(data.error.message||data.error);
-  if (!data.content||!data.content[0]) throw new Error('Пустой ответ');
+  if (data.error) throw new Error(data.error.message || data.error);
+  if (!data.content || !data.content[0]) throw new Error('Пустой ответ');
   return data.content[0].text;
 }
 
 async function genTitle() {
-  var el=document.getElementById('titleOut');
-  el.className='tk-out loading'; el.textContent='✨ Claude генерирует название...';
+  var el = document.getElementById('titleOut');
+  el.className = 'tk-out loading'; el.textContent = '✨ Claude генерирует название...';
   try {
-    var r=await claudeText(
-      getCtx()+
-      '\nСоздай один цепляющий заголовок для этого видео на '+state.lang+' языке.\n'+
-      'Требования: до 100 символов, содержит ключевые слова темы, вызывает желание кликнуть.\n'+
+    var r = await claudeText(
+      getCtx() +
+      '\nСоздай один цепляющий заголовок для этого видео на ' + state.lang + ' языке.\n' +
+      'Требования: до 100 символов, содержит ключевые слова темы, вызывает желание кликнуть.\n' +
       'Верни ТОЛЬКО сам заголовок — без кавычек, скобок и пояснений.'
     );
-    el.textContent=r.trim().replace(/^["«»""]|["«»""]$/g,'');
-    el.className='tk-out';
-    notify('Название создано','ok');
-  } catch(e) {
-    el.textContent='Ошибка: '+e.message;
-    el.className='tk-out';
-    notify('Ошибка: '+e.message,'err');
+    el.textContent = r.trim().replace(/^["«»""]|["«»""]$/g, '');
+    el.className = 'tk-out';
+    notify('Название создано', 'ok');
+  } catch (e) {
+    el.textContent = 'Ошибка: ' + e.message;
+    el.className = 'tk-out';
+    notify('Ошибка: ' + e.message, 'err');
   }
 }
 
 async function genDesc() {
-  var el=document.getElementById('descOut');
-  el.className='tk-out loading'; el.textContent='✨ Claude генерирует описание...';
+  var el = document.getElementById('descOut');
+  el.className = 'tk-out loading'; el.textContent = '✨ Claude генерирует описание...';
   try {
-    var platHint={
-      'YouTube':'Включи тайм-коды (00:00 Введение, и т.д.), призыв подписаться и поставить лайк. До 500 слов.',
-      'Instagram':'3-5 коротких строк, живой стиль, эмодзи, призыв сохранить пост.',
-      'TikTok':'1-3 строки максимум, вирусный крючок с первых слов.',
-      'ВКонтакте':'Развёрнутое и информативное, без лишних эмодзи.',
-      'Telegram':'Структурированное, с эмодзи-маркерами, призыв обсудить в комментариях.'
-    }[currentPlatText]||'';
-    var r=await claudeText(
-      getCtx()+
-      '\nНапиши описание для '+currentPlatText+' на '+state.lang+' языке.\n'+
-      platHint+'\n'+
-      'Описание должно точно отражать реальное содержимое видео.\n'+
+    var platHint = {
+      'YouTube': 'Включи тайм-коды (00:00 Введение, и т.д.), призыв подписаться и поставить лайк. До 500 слов.',
+      'Instagram': '3-5 коротких строк, живой стиль, эмодзи, призыв сохранить пост.',
+      'TikTok': '1-3 строки максимум, вирусный крючок с первых слов.',
+      'ВКонтакте': 'Развёрнутое и информативное, без лишних эмодзи.',
+      'Telegram': 'Структурированное, с эмодзи-маркерами, призыв обсудить в комментариях.'
+    }[currentPlatText] || '';
+    var r = await claudeText(
+      getCtx() +
+      '\nНапиши описание для ' + currentPlatText + ' на ' + state.lang + ' языке.\n' +
+      platHint + '\n' +
+      'Описание должно точно отражать реальное содержимое видео.\n' +
       'Верни ТОЛЬКО текст описания.'
     );
-    el.textContent=r.trim();
-    el.className='tk-out';
-    notify('Описание создано','ok');
-  } catch(e) {
-    el.textContent='Ошибка: '+e.message;
-    el.className='tk-out';
-    notify('Ошибка: '+e.message,'err');
+    el.textContent = r.trim();
+    el.className = 'tk-out';
+    notify('Описание создано', 'ok');
+  } catch (e) {
+    el.textContent = 'Ошибка: ' + e.message;
+    el.className = 'tk-out';
+    notify('Ошибка: ' + e.message, 'err');
   }
 }
 
 async function genTags() {
-  var wrap=document.getElementById('tagsOut');
-  wrap.innerHTML='<span class="tag-emp" style="opacity:.5">✨ Claude генерирует теги...</span>';
+  var wrap = document.getElementById('tagsOut');
+  wrap.innerHTML = '<span class="tag-emp" style="opacity:.5">✨ Claude генерирует теги...</span>';
   try {
-    var r=await claudeText(
-      getCtx()+
-      '\nСоздай 15-20 хэштегов для этого видео на '+state.lang+' языке.\n'+
-      'Формат: каждый тег начинается с # и разделены пробелами.\n'+
-      'Теги должны точно соответствовать теме видео.\n'+
+    var r = await claudeText(
+      getCtx() +
+      '\nСоздай 15-20 хэштегов для этого видео на ' + state.lang + ' языке.\n' +
+      'Формат: каждый тег начинается с # и разделены пробелами.\n' +
+      'Теги должны точно соответствовать теме видео.\n' +
       'Верни ТОЛЬКО теги, без пояснений и нумерации.'
     );
-    var tags=r.trim().split(/\s+/).filter(function(t){return t.startsWith('#')&&t.length>1;});
+    var tags = r.trim().split(/\s+/).filter(function(t) { return t.startsWith('#') && t.length > 1; });
     if (!tags.length) {
-      tags=r.split(/[\n,]/).map(function(t){return t.trim();})
-        .filter(function(t){return t.length>1;})
-        .map(function(t){return t.startsWith('#')?t:'#'+t;});
+      tags = r.split(/[\n,]/).map(function(t) { return t.trim(); })
+        .filter(function(t) { return t.length > 1; })
+        .map(function(t) { return t.startsWith('#') ? t : '#' + t; });
     }
     if (tags.length) {
-      wrap.innerHTML=tags.map(function(t){
-        return '<span class="tag" onclick="this.classList.toggle('sel')">'+t+'</span>';
+      wrap.innerHTML = tags.map(function(t) {
+        return '<span class="tag" onclick="this.classList.toggle(\'sel\')">' + t + '</span>';
       }).join('');
-      notify('Теги созданы','ok');
+      notify('Теги созданы', 'ok');
     } else {
-      wrap.innerHTML='<span class="tag-emp">Не удалось создать теги — попробуйте ещё раз</span>';
+      wrap.innerHTML = '<span class="tag-emp">Не удалось создать теги — попробуйте ещё раз</span>';
     }
-  } catch(e) {
-    wrap.innerHTML='<span class="tag-emp">Ошибка: '+e.message+'</span>';
-    notify('Ошибка: '+e.message,'err');
+  } catch (e) {
+    wrap.innerHTML = '<span class="tag-emp">Ошибка: ' + e.message + '</span>';
+    notify('Ошибка: ' + e.message, 'err');
   }
 }
 
 // ═══ ЭКСПОРТ ТЕКСТОВ ══════════════════════════════════════════
 function copyField(id) {
-  var t=document.getElementById(id).textContent;
-  if (!t||t.includes('Нажмите')||t.includes('Генерирую')||t.includes('Ошибка')) {
-    notify('Сначала создайте текст','err'); return;
+  var t = document.getElementById(id).textContent;
+  if (!t || t.includes('Нажмите') || t.includes('Генерирую') || t.includes('Ошибка')) {
+    notify('Сначала создайте текст', 'err'); return;
   }
-  navigator.clipboard.writeText(t).then(function(){notify('Скопировано!','ok');});
+  navigator.clipboard.writeText(t).then(function() { notify('Скопировано!', 'ok'); });
 }
 
 function copyTags() {
-  var tags=Array.from(document.querySelectorAll('#tagsOut .tag'))
-    .map(function(t){return t.textContent;}).join(' ');
-  if (!tags) { notify('Сначала создайте теги','err'); return; }
-  navigator.clipboard.writeText(tags).then(function(){notify('Теги скопированы!','ok');});
+  var tags = Array.from(document.querySelectorAll('#tagsOut .tag'))
+    .map(function(t) { return t.textContent; }).join(' ');
+  if (!tags) { notify('Сначала создайте теги', 'err'); return; }
+  navigator.clipboard.writeText(tags).then(function() { notify('Теги скопированы!', 'ok'); });
 }
 
 function expTexts(type) {
-  var title=document.getElementById('titleOut').textContent;
-  var desc=document.getElementById('descOut').textContent;
-  var tags=Array.from(document.querySelectorAll('#tagsOut .tag'))
-    .map(function(t){return t.textContent;}).join(' ');
-  if (type==='copy') {
+  var title = document.getElementById('titleOut').textContent;
+  var desc = document.getElementById('descOut').textContent;
+  var tags = Array.from(document.querySelectorAll('#tagsOut .tag'))
+    .map(function(t) { return t.textContent; }).join(' ');
+  if (type === 'copy') {
     navigator.clipboard.writeText(
-      'НАЗВАНИЕ:\n'+title+'\n\nОПИСАНИЕ:\n'+desc+'\n\nТЕГИ:\n'+tags
-    ).then(function(){notify('Всё скопировано!','ok');});
+      'НАЗВАНИЕ:\n' + title + '\n\nОПИСАНИЕ:\n' + desc + '\n\nТЕГИ:\n' + tags
+    ).then(function() { notify('Всё скопировано!', 'ok'); });
     return;
   }
-  var content='', ext='txt';
-  if (type==='json') {
-    content=JSON.stringify({title:title,description:desc,tags:tags,platform:currentPlatText,video:state.videoName},null,2);
-    ext='json';
-  } else if (type==='md') {
-    content='# '+title+'\n\n## Описание\n'+desc+'\n\n## Теги\n'+tags;
-    ext='md';
+  var content = '', ext = 'txt';
+  if (type === 'json') {
+    content = JSON.stringify({ title: title, description: desc, tags: tags, platform: currentPlatText, video: state.videoName }, null, 2);
+    ext = 'json';
+  } else if (type === 'md') {
+    content = '# ' + title + '\n\n## Описание\n' + desc + '\n\n## Теги\n' + tags;
+    ext = 'md';
   } else {
-    content='НАЗВАНИЕ:\n'+title+'\n\nОПИСАНИЕ:\n'+desc+'\n\nТЕГИ:\n'+tags;
+    content = 'НАЗВАНИЕ:\n' + title + '\n\nОПИСАНИЕ:\n' + desc + '\n\nТЕГИ:\n' + tags;
   }
-  var a=document.createElement('a');
-  a.href=URL.createObjectURL(new Blob([content],{type:'text/plain;charset=utf-8'}));
-  a.download='neuropreviy_texts.'+ext;
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([content], { type: 'text/plain;charset=utf-8' }));
+  a.download = 'neuropreviy_texts.' + ext;
   a.click();
-  notify('Файл сохранён','ok');
+  notify('Файл сохранён', 'ok');
 }
 
 // ═══ ИСТОРИЯ ══════════════════════════════════════════════════
 function showHistory() {
-  var el=document.getElementById('histPanel');
+  var el = document.getElementById('histPanel');
   if (el) { el.remove(); return; }
-  var p=document.createElement('div');
-  p.id='histPanel';
-  p.style.cssText='position:fixed;top:0;right:0;width:300px;height:100vh;background:var(--s1);border-left:1px solid var(--b);z-index:200;overflow-y:auto;padding:1.2rem;box-shadow:-4px 0 24px rgba(0,0,0,.5)';
-  p.innerHTML=
-    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem">'+
-    '<b style="font-size:15px">📁 История</b>'+
-    '<button onclick="document.getElementById('histPanel').remove()" '+
-    'style="background:none;border:none;color:var(--t2);cursor:pointer;font-size:20px">✕</button></div>'+
+  var p = document.createElement('div');
+  p.id = 'histPanel';
+  p.style.cssText = 'position:fixed;top:0;right:0;width:300px;height:100vh;background:var(--s1);border-left:1px solid var(--b);z-index:200;overflow-y:auto;padding:1.2rem;box-shadow:-4px 0 24px rgba(0,0,0,.5)';
+  p.innerHTML =
+    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem">' +
+    '<b style="font-size:15px">📁 История</b>' +
+    '<button onclick="document.getElementById(\'histPanel\').remove()" ' +
+    'style="background:none;border:none;color:var(--t2);cursor:pointer;font-size:20px">✕</button></div>' +
     (state.history.length
-      ? state.history.map(function(h){
-          return '<div style="padding:9px;background:var(--s2);border:1px solid var(--b);border-radius:9px;margin-bottom:6px">'+
-            '<div style="font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+h.name+'</div>'+
-            '<div style="font-size:11px;color:var(--t3);margin-top:2px">'+h.date+'</div></div>';
+      ? state.history.map(function(h) {
+          return '<div style="padding:9px;background:var(--s2);border:1px solid var(--b);border-radius:9px;margin-bottom:6px">' +
+            '<div style="font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + h.name + '</div>' +
+            '<div style="font-size:11px;color:var(--t3);margin-top:2px">' + h.date + '</div></div>';
         }).join('')
-      : '<div style="color:var(--t3);font-size:13px;text-align:center;padding:2rem">История пуста</div>')+
+      : '<div style="color:var(--t3);font-size:13px;text-align:center;padding:2rem">История пуста</div>') +
     (state.history.length
-      ? '<button onclick="clearHist()" style="width:100%;margin-top:.5rem;padding:8px;background:var(--rdb);'+
+      ? '<button onclick="clearHist()" style="width:100%;margin-top:.5rem;padding:8px;background:var(--rdb);' +
         'border:1px solid rgba(248,113,113,.3);color:var(--rd);border-radius:var(--r);cursor:pointer;font-size:12px">🗑 Очистить</button>'
       : '');
   document.body.appendChild(p);
-  setTimeout(function(){
-    var h=function(e){
-      if (!p.contains(e.target)&&!e.target.closest('.nav-btn')) {
-        p.remove(); document.removeEventListener('click',h);
+  setTimeout(function() {
+    var h = function(e) {
+      if (!p.contains(e.target) && !e.target.closest('.nav-btn')) {
+        p.remove(); document.removeEventListener('click', h);
       }
     };
-    document.addEventListener('click',h);
-  },200);
+    document.addEventListener('click', h);
+  }, 200);
 }
 
 function clearHist() {
-  state.history=[];
+  state.history = [];
   localStorage.removeItem('np_history');
-  var el=document.getElementById('histPanel');
+  var el = document.getElementById('histPanel');
   if (el) el.remove();
-  notify('История очищена','ok');
+  notify('История очищена', 'ok');
 }
 
 // ═══ ПРОГРЕСС ═════════════════════════════════════════════════
-function setStep(n,st) {
-  var el=document.getElementById('ps'+n); if(!el) return;
-  el.classList.remove('cur','done');
-  if (st==='cur'||st==='done') el.classList.add(st);
-  el.querySelector('.psi').textContent = st==='done'?'✓':st==='cur'?'⚡':'⏳';
+function setStep(n, st) {
+  var el = document.getElementById('ps' + n); if (!el) return;
+  el.classList.remove('cur', 'done');
+  if (st === 'cur' || st === 'done') el.classList.add(st);
+  el.querySelector('.psi').textContent = st === 'done' ? '✓' : st === 'cur' ? '⚡' : '⏳';
 }
-function setPct(p) { document.getElementById('pbarFill').style.width=p+'%'; }
+function setPct(p) { document.getElementById('pbarFill').style.width = p + '%'; }
 function addLog(msg) {
-  var el=document.getElementById('logBox');
-  el.textContent+=(el.textContent?'\n':'')+msg;
-  el.scrollTop=el.scrollHeight;
+  var el = document.getElementById('logBox');
+  el.textContent += (el.textContent ? '\n' : '') + msg;
+  el.scrollTop = el.scrollHeight;
 }
 
 // ═══ RESET ════════════════════════════════════════════════════
 function resetAll() {
-  state.videoFile=null; state.videoUrl=null; state.videoName='';
-  state.videoFrameB64=null; state.videoAnalysis=null;
-  state.thumbUrls=[]; state.imagePrompts=[];
-  document.getElementById('vinfoWrap').style.display='none';
-  document.getElementById('toS2').style.display='none';
-  document.getElementById('urlInp').value='';
-  document.getElementById('logBox').textContent='Ожидание...';
-  document.getElementById('pbarFill').style.width='0%';
-  document.getElementById('progTitle').textContent='Анализируем видео...';
-  document.getElementById('thumbsGrid').innerHTML='';
+  state.videoFile = null; state.videoUrl = null; state.videoName = '';
+  state.videoFrameB64 = null; state.videoAnalysis = null;
+  state.thumbUrls = []; state.imagePrompts = [];
+  document.getElementById('vinfoWrap').style.display = 'none';
+  document.getElementById('toS2').style.display = 'none';
+  document.getElementById('urlInp').value = '';
+  document.getElementById('logBox').textContent = 'Ожидание...';
+  document.getElementById('pbarFill').style.width = '0%';
+  document.getElementById('progTitle').textContent = 'Анализируем видео...';
+  document.getElementById('thumbsGrid').innerHTML = '';
   resetTextOutputs();
-  for(var i=1;i<=6;i++) setStep(i,i===1?'cur':'wait');
+  for (var i = 1; i <= 6; i++) setStep(i, i === 1 ? 'cur' : 'wait');
   goToStep(1);
 }
 
 // Keyboard shortcuts
-document.addEventListener('keydown',function(e){
-  if (e.key==='Escape') {
-    var el=document.getElementById('histPanel');
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') {
+    var el = document.getElementById('histPanel');
     if (el) el.remove();
   }
 });
+
 </script>
 </body>
 </html>
